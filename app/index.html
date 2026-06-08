@@ -515,53 +515,26 @@ function reducer(state, action) {
         // nothing sold -> straight to squad
         return { ...state, sold, state: 'SQUAD' };
       }
-      return { ...state, sold, state: 'WINDOW_REVEAL', revealIdx: 0, revealStage: 0 };
+      return enterSold({ ...state, sold }, 0);
+    }
+
+    case 'SELECT_REPLACEMENT': {
+      // Chosen on the anonymous REPLACE_PICK page, BEFORE the reveal. Only record the
+      // choice + remove the card from the shelf here — money is applied on reveal commit.
+      const item = state.sold[state.revealIdx];
+      const sold = state.sold.map((s, i) => i === state.revealIdx ? { ...s, replacementId: action.playerId } : s);
+      const shelf = { ...state.shelf, [item.pos]: state.shelf[item.pos].filter(p => p.id !== action.playerId) };
+      return { ...state, sold, shelf, state: 'WINDOW_REVEAL', revealStage: 0 };
     }
 
     case 'REVEAL_NEXT': {
-      // Stages for the SOLD player only: 0 buy · 1 sell · 2 identity · 3 profit.
-      // Replacement is chosen on a separate anonymous page (REPLACE_PICK), never revealed here.
-      if (state.revealStage < 3) return { ...state, revealStage: state.revealStage + 1 };
-      return state; // at stage 3 the screen shows buttons, not click-to-advance
-    }
-
-    case 'REVEAL_GO_REPLACE':
-      return { ...state, state: 'REPLACE_PICK' };
-
-    case 'REVEAL_PICK_REPLACEMENT': {
-      // record replacement (kept hidden), charge spend, remove from shelf, bank profit, advance
+      // Stages for the SOLD player: 0 buy · 1 sell · 2 identity · 3 sale profit/loss
+      // · 4 (only if a replacement was chosen) replacement old→new market value.
       const item = state.sold[state.revealIdx];
-      const repl = PLAYER_BY_ID[action.playerId];
-      const sold = state.sold.map((s, i) => i === state.revealIdx ? { ...s, replacementId: action.playerId } : s);
-      const managers = state.managers.map(m => {
-        if (m.id !== item.mgrId) return m;
-        return {
-          ...m,
-          squad: { ...m.squad, [item.pos]: action.playerId },
-          // a redrafted replacement is locked — it can't be sold in a later window
-          locked: { ...m.locked, [item.pos]: true },
-          // recover the sold player's buy price, charge the replacement's
-          totalSpent: m.totalSpent - item.player.buyVal + repl.buyVal,
-          bankedProfit: m.bankedProfit + (item.player.sellVal - item.player.buyVal),
-        };
-      });
-      const shelf = { ...state.shelf, [item.pos]: state.shelf[item.pos].filter(p => p.id !== action.playerId) };
-      return advanceReveal({ ...state, sold, managers, shelf });
-    }
-
-    case 'REVEAL_SKIP': {
-      // sold with no replacement taken -> empty the slot, bank the profit, advance
-      const item = state.sold[state.revealIdx];
-      const managers = state.managers.map(m => {
-        if (m.id !== item.mgrId || m.squad[item.pos] !== item.player.id) return m;
-        return {
-          ...m,
-          squad: { ...m.squad, [item.pos]: null },
-          totalSpent: m.totalSpent - item.player.buyVal,
-          bankedProfit: m.bankedProfit + (item.player.sellVal - item.player.buyVal),
-        };
-      });
-      return advanceReveal({ ...state, managers });
+      const maxStage = item.replacementId ? 4 : 3;
+      if (state.revealStage < maxStage) return { ...state, revealStage: state.revealStage + 1 };
+      // final stage -> apply money, then move to the next sold player (or squad)
+      return enterSold(applySoldMoney(state), state.revealIdx + 1);
     }
 
     case 'FINAL_NEXT': {
@@ -581,12 +554,41 @@ function reducer(state, action) {
   }
 }
 
-// helper used inside reducer: go to next sold player's reveal, or back to squad
-function advanceReveal(state) {
-  const nextIdx = state.revealIdx + 1;
-  if (nextIdx < state.sold.length)
-    return { ...state, state: 'WINDOW_REVEAL', revealIdx: nextIdx, revealStage: 0 };
-  return { ...state, state: 'SQUAD' };
+// Enter sold player `idx`: pick a replacement first (if the shelf has options),
+// otherwise go straight to the reveal. When no sold players remain, return to squad.
+function enterSold(state, idx) {
+  if (idx >= state.sold.length) return { ...state, state: 'SQUAD' };
+  const item = state.sold[idx];
+  const hasShelf = (state.shelf[item.pos] || []).length > 0;
+  return { ...state, revealIdx: idx, revealStage: 0, state: hasShelf ? 'REPLACE_PICK' : 'WINDOW_REVEAL' };
+}
+
+// Apply the money for the current sold player once its reveal completes.
+// Replacement costs its CURRENT market value (keeping the original buy in totalSpent),
+// so rebuying at market nets to zero; transfer profit = sell price − replacement cost.
+function applySoldMoney(state) {
+  const item = state.sold[state.revealIdx];
+  const repl = item.replacementId ? PLAYER_BY_ID[item.replacementId] : null;
+  const managers = state.managers.map(m => {
+    if (m.id !== item.mgrId) return m;
+    if (repl) {
+      return {
+        ...m,
+        squad: { ...m.squad, [item.pos]: repl.id },
+        locked: { ...m.locked, [item.pos]: true }, // a redraft can't be sold again
+        totalSpent: m.totalSpent + repl.curVal,
+        bankedProfit: m.bankedProfit + (item.player.sellVal - repl.curVal),
+      };
+    }
+    // sold without replacing -> empty slot, keep full sale proceeds
+    if (m.squad[item.pos] !== item.player.id) return m;
+    return {
+      ...m,
+      squad: { ...m.squad, [item.pos]: null },
+      bankedProfit: m.bankedProfit + item.player.sellVal,
+    };
+  });
+  return { ...state, managers };
 }
 
 /* =========================================================================
@@ -597,7 +599,7 @@ function PosBadge({ pos, size }) {
   return <span className={'pos-badge' + (size ? ' ' + size : '')}>{POS_LABEL[pos] || pos}</span>;
 }
 
-function Silhouette({ className }) { return <div className={'silh ' + (className || '')} />; }
+function Silhouette({ className, style }) { return <div className={'silh ' + (className || '')} style={style} />; }
 
 function StatRow({ label, value }) {
   const isText = typeof value === 'string';
@@ -928,13 +930,13 @@ function WindowRevealScreen({ state, dispatch }) {
   const mgr = state.managers.find(m => m.id === item.mgrId);
   const stage = state.revealStage;
   const p = item.player;
-  const shelf = state.shelf[item.pos] || [];
-  const hasShelf = shelf.length > 0;
-  const profit = p.sellVal - p.buyVal;
+  const repl = item.replacementId ? PLAYER_BY_ID[item.replacementId] : null;
+  const profit = p.sellVal - p.buyVal;       // sale profit/loss for the sold player
   const posLbl = POS_LABEL[p.pos];
+  const maxStage = repl ? 4 : 3;
+  const lastSold = state.revealIdx >= state.sold.length - 1;
 
-  // Click/space advances stages 0..3; at stage 3 the buttons take over.
-  const advance = () => { if (stage < 3) dispatch({ type: 'REVEAL_NEXT' }); };
+  const advance = () => dispatch({ type: 'REVEAL_NEXT' });
   useKey(' ', advance);
 
   return (
@@ -955,24 +957,30 @@ function WindowRevealScreen({ state, dispatch }) {
           )}
         </div>
 
-        {/* profit / loss */}
+        {/* sale profit / loss */}
         {stage >= 3 && (
           <div style={{ textAlign:'center' }}>
             <div className={'rv-profit ' + (profit >= 0 ? 'good' : 'bad')}>{profit>=0?'+':''}{fmtM(profit)}</div>
-            <div className="rv-profit-lbl">{profit >= 0 ? 'Profit' : 'Loss'}</div>
+            <div className="rv-profit-lbl">{profit >= 0 ? 'Profit' : 'Loss'} on sale</div>
           </div>
         )}
 
-        {/* actions at the final stage */}
-        {stage >= 3 ? (
-          <div style={{ display:'flex', gap:16, marginTop:8 }}>
-            {hasShelf
-              ? <button className="btn btn-primary btn-lg" onClick={() => dispatch({ type:'REVEAL_GO_REPLACE' })}>Select a replacement →</button>
-              : <button className="btn btn-ghost btn-lg" onClick={() => dispatch({ type:'REVEAL_SKIP' })}>No replacement available · Continue →</button>}
+        {/* replacement old → new market value (identity stays hidden) */}
+        {repl && stage >= 4 && (
+          <div className="rv-card" style={{ minWidth: 480 }}>
+            <div className="kicker">Your replacement {posLbl}</div>
+            <Silhouette className="rv-silh" style={{ width: 96, height: 96 }} />
+            <div className="rv-line"><span className="l">Was</span><span className="v" style={{ color:'var(--text-dim)' }}>{fmtM(repl.buyVal)}</span></div>
+            <div className="rv-line"><span className="l">You pay (today)</span>
+              <Money value={repl.curVal} run={true} className="v" />
+            </div>
           </div>
-        ) : (
-          <div className="hint">Click to reveal next →</div>
         )}
+
+        <div className="hint">
+          {stage < maxStage ? 'Click to reveal next →'
+            : lastSold ? 'Click to view squad →' : 'Click for the next sale →'}
+        </div>
       </div>
     </div>
   );
@@ -1004,7 +1012,7 @@ function ReplacePickScreen({ state, dispatch }) {
               <div className="pick-confirm" onClick={e => e.stopPropagation()}>
                 <div className="pc-q">Sign this player for<br/><span className="pc-mgr">{mgr.name}</span>?</div>
                 <div className="pc-btns">
-                  <button className="btn btn-primary" onClick={() => dispatch({ type:'REVEAL_PICK_REPLACEMENT', playerId: p.id })}>Yes, sign</button>
+                  <button className="btn btn-primary" onClick={() => dispatch({ type:'SELECT_REPLACEMENT', playerId: p.id })}>Yes, sign</button>
                   <button className="btn btn-ghost" onClick={() => setPicking(null)}>Cancel</button>
                 </div>
               </div>
@@ -1012,7 +1020,7 @@ function ReplacePickScreen({ state, dispatch }) {
           </div>
         ))}
       </div>
-      <div className="hint">Click a card to sign · their value and name reveal only at the end</div>
+      <div className="hint">Click a card to sign · you'll pay their current market value (revealed next) · name stays hidden until the end</div>
     </div>
   );
 }
@@ -1059,8 +1067,9 @@ function FinalRevealScreen({ state, dispatch }) {
               {col.map(slot => {
                 const revealed = finalPosRevealed(state, slot.posKey);
                 const p = slot.player;
-                // Part 2 (profit pass): flip each revealed slot's value to its gain/loss.
-                const net = p ? p.curVal - p.buyVal : 0;
+                // Part 2 (profit pass): each slot shows its gain/loss vs what was paid.
+                // Replacements were bought at current market value, so they net €0.
+                const net = p ? (mgr.locked[slot.posKey] ? 0 : p.curVal - p.buyVal) : 0;
                 return (
                   <div key={slot.posKey} className={'pitch-slot ' + (p ? (revealed?'filled':'empty') : 'empty')}>
                     <div className="slot-circle">
