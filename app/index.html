@@ -1137,7 +1137,7 @@ function StandingsScreen({ state, dispatch }) {
           </div>
         )}
         <table className="standings-table">
-          <thead><tr><th>#</th><th>Manager</th><th>Squad Value</th><th>Spent</th><th>Transfer Profit</th><th>Total</th></tr></thead>
+          <thead><tr><th>#</th><th>Manager</th><th>Squad Value</th><th>Transfer Profit</th><th>Total</th></tr></thead>
           <tbody>
             {ranked.map((r, i) => {
               const show = i < state.standRevealed || allRevealed;
@@ -1146,7 +1146,6 @@ function StandingsScreen({ state, dispatch }) {
                   <td className="num">{i + 1}</td>
                   <td>{r.m.name}</td>
                   <td className="num">{fmtM(r.sq)}</td>
-                  <td className="num">−{fmtM(r.m.totalSpent)}</td>
                   <td className="num">{fmtM(r.m.bankedProfit)}</td>
                   <td className="num" style={{ color: show ? (r.score>=0?'var(--acc)':'var(--bad)') : 'var(--text-faint)', fontWeight:800 }}>
                     {show ? fmtM(r.score) : '€??M'}
