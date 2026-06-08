@@ -438,7 +438,9 @@ function reducer(state, action) {
 
     case 'ANNOUNCE_DONE': {
       const se = curSeason(state);
-      if (se.type === 'window') return { ...state, state: 'WINDOW_DECIDE', windowMgr: 0, windowSel: {} };
+      // Start each window fresh — `sold` must not carry over from a previous window,
+      // otherwise the reveal (revealIdx resets to 0) replays earlier windows' sales.
+      if (se.type === 'window') return { ...state, state: 'WINDOW_DECIDE', windowMgr: 0, windowSel: {}, sold: [] };
       return { ...state, state: 'DRAFT', draftIdx: 0, picking: null, outIdx: null };
     }
 
