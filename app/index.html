@@ -380,22 +380,22 @@ function squadValue(mgr) {
   return Object.values(mgr.squad).reduce((sum, pid) => sum + (pid ? PLAYER_BY_ID[pid].curVal : 0), 0);
 }
 function scoreOf(mgr) {
-  // gain from each original pick still held + profit banked from selling original picks
+  // gain from each pick: original = curVal−buyVal, replacement = curVal−sellVal (window price paid)
   const heldGain = Object.keys(mgr.squad).reduce((sum, pos) => {
     const pid = mgr.squad[pos];
-    if (!pid || mgr.locked[pos]) return sum;
+    if (!pid) return sum;
     const p = PLAYER_BY_ID[pid];
-    return sum + p.curVal - p.buyVal;
+    return sum + p.curVal - (mgr.locked[pos] ? p.sellVal : p.buyVal);
   }, 0);
   return heldGain + mgr.bankedProfit;
 }
 // What a manager paid for the player currently in a slot: draft value for an original
-// pick, or the (current-value) fee paid for a redrafted replacement. Spoiler-free —
+// pick, or the window-year price paid for a redrafted replacement. Spoiler-free —
 // these are the figures the manager already saw when acquiring the player.
 function paidFor(mgr, posKey) {
   const pid = mgr.squad[posKey];
   if (!pid) return 0;
-  return mgr.locked[posKey] ? PLAYER_BY_ID[pid].curVal : PLAYER_BY_ID[pid].buyVal;
+  return mgr.locked[posKey] ? PLAYER_BY_ID[pid].sellVal : PLAYER_BY_ID[pid].buyVal;
 }
 function squadPaid(mgr) {
   return Object.keys(mgr.squad).reduce((sum, pos) => sum + paidFor(mgr, pos), 0);
@@ -576,7 +576,7 @@ function applySoldMoney(state) {
         ...m,
         squad: { ...m.squad, [item.pos]: repl.id },
         locked: { ...m.locked, [item.pos]: true }, // a redraft can't be sold again
-        totalSpent: m.totalSpent + repl.curVal,
+        totalSpent: m.totalSpent + repl.sellVal,   // charge window-year price, not 2025/26 value
         bankedProfit: m.bankedProfit + (item.player.sellVal - item.player.buyVal),
       };
     }
@@ -974,8 +974,8 @@ function WindowRevealScreen({ state, dispatch }) {
             <div className="kicker">Your replacement {posLbl}</div>
             <Silhouette className="rv-silh" style={{ width: 96, height: 96 }} />
             <div className="rv-line"><span className="l">Was</span><span className="v" style={{ color:'var(--text-dim)' }}>{fmtM(repl.buyVal)}</span></div>
-            <div className="rv-line"><span className="l">You pay (today)</span>
-              <Money value={repl.curVal} run={true} className="v" />
+            <div className="rv-line"><span className="l">You pay (window)</span>
+              <Money value={repl.sellVal} run={true} className="v" />
             </div>
           </div>
         )}
@@ -1045,7 +1045,7 @@ function FinalRevealScreen({ state, dispatch }) {
     if (idx <= state.finalIdx) {
       const pid = mgr.squad[posKey];
       const p = pid ? PLAYER_BY_ID[pid] : null;
-      running += p ? (mgr.locked[posKey] ? 0 : p.curVal - p.buyVal) : 0;
+      running += p ? p.curVal - (mgr.locked[posKey] ? p.sellVal : p.buyVal) : 0;
     }
   });
   const tween = useTween(running);
@@ -1073,7 +1073,7 @@ function FinalRevealScreen({ state, dispatch }) {
                 const p = slot.player;
                 // Part 2 (profit pass): each slot shows its gain/loss vs what was paid.
                 // Replacements were bought at current market value, so they net €0.
-                const net = p ? (mgr.locked[slot.posKey] ? 0 : p.curVal - p.buyVal) : 0;
+                const net = p ? p.curVal - (mgr.locked[slot.posKey] ? p.sellVal : p.buyVal) : 0;
                 return (
                   <div key={slot.posKey} className={'pitch-slot ' + (p ? (revealed?'filled':'empty') : 'empty')}>
                     <div className="slot-circle">
