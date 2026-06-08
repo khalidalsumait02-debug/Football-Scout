@@ -187,6 +187,9 @@ input { font-family: inherit; }
 .pitch-slot.empty .slot-circle { border-style: dashed; background: rgba(0,0,0,0.18); color: rgba(255,255,255,0.6); }
 .pitch-slot.filled .slot-circle { background: var(--acc); color: #0d1117; border-color: var(--acc); box-shadow: 0 0 0 6px var(--acc-glow); }
 .pitch-slot.sell .slot-circle { background: var(--bad); color: #fff; border-color: var(--bad); box-shadow: 0 0 0 6px rgba(239,68,68,0.3); }
+.pitch-slot.locked { opacity: 0.45; }
+.pitch-slot.locked .slot-circle { box-shadow: none; filter: grayscale(0.5); }
+.lock-badge { position: absolute; right: -4px; bottom: -4px; font-size: 22px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.6)); }
 .slot-silh { width: 54px; height: 54px; }
 .slot-pos { font-family: var(--font-d); font-weight: 700; font-size: 16px; color: #fff; background: rgba(0,0,0,0.35); padding: 1px 8px; border-radius: 6px; }
 .slot-val { font-family: var(--font-d); font-weight: 700; font-size: 22px; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.5); }
@@ -432,6 +435,7 @@ function reducer(state, action) {
       const managers = action.managers.map((name, i) => ({
         id: 'm' + i, name, squad: { CB:null,WF:null,DM:null,GK:null,ST:null,AM:null,CB2:null },
         totalSpent: 0, bankedProfit: 0,
+        locked: {}, // positions holding a window replacement — can't be sold again
       }));
       return { ...initial, managers, state: 'ANNOUNCE', seasonStep: 0 };
     }
@@ -484,10 +488,10 @@ function reducer(state, action) {
     }
 
     case 'WINDOW_TOGGLE': {
-      // Single-select: at most one sale per window. Clicking the chosen player
-      // clears it; clicking another switches the selection.
-      if (state.windowSel[action.playerId]) return { ...state, windowSel: {} };
-      return { ...state, windowSel: { [action.playerId]: true } };
+      // Multi-select: sell any number of original picks this window.
+      const sel = { ...state.windowSel };
+      if (sel[action.playerId]) delete sel[action.playerId]; else sel[action.playerId] = true;
+      return { ...state, windowSel: sel };
     }
 
     case 'WINDOW_CONFIRM': {
@@ -497,7 +501,7 @@ function reducer(state, action) {
       const newSold = [];
       Object.keys(mgr.squad).forEach(pos => {
         const pid = mgr.squad[pos];
-        if (pid && state.windowSel[pid]) {
+        if (pid && state.windowSel[pid] && !mgr.locked[pos]) {
           newSold.push({ mgrId: mgr.id, pos, player: PLAYER_BY_ID[pid], replacementId: null });
         }
       });
@@ -534,6 +538,8 @@ function reducer(state, action) {
         return {
           ...m,
           squad: { ...m.squad, [item.pos]: action.playerId },
+          // a redrafted replacement is locked — it can't be sold in a later window
+          locked: { ...m.locked, [item.pos]: true },
           // recover the sold player's buy price, charge the replacement's
           totalSpent: m.totalSpent - item.player.buyVal + repl.buyVal,
           bankedProfit: m.bankedProfit + (item.player.sellVal - item.player.buyVal),
@@ -825,8 +831,9 @@ function PitchFormation({ mgr, mode, state, dispatch }) {
         {cols.map((col, ci) => (
           <div key={ci} className="pitch-col">
             {col.map(slot => {
-              // Any player in the squad can be sold this window (one per window).
-              const sellable = mode === 'sell' && !!slot.player;
+              // Original picks can be sold any window; redrafted replacements are locked.
+              const locked = mode === 'sell' && !!slot.player && !!mgr.locked[slot.posKey];
+              const sellable = mode === 'sell' && !!slot.player && !locked;
               const isSell = mode === 'sell' && slot.player && state.windowSel[slot.player.id];
               const revealed = mode === 'final' && finalPosRevealed(state, slot.posKey);
               const draftYr = SEASON_SEQUENCE.find(s => s.pos === slot.posKey)?.yr;
@@ -835,11 +842,13 @@ function PitchFormation({ mgr, mode, state, dispatch }) {
               else if (isSell) cls += 'sell';
               else cls += 'filled';
               if (sellable) cls += ' clickable';
+              if (locked) cls += ' locked';
               return (
                 <div key={slot.posKey} className={cls}
                      onClick={() => sellable && dispatch({ type: 'WINDOW_TOGGLE', playerId: slot.player.id })}>
                   <div className="slot-circle">
                     {slot.player ? <Silhouette className="slot-silh" /> : POS_LABEL[slot.posKey]}
+                    {locked && <span className="lock-badge">🔒</span>}
                   </div>
                   <span className="slot-pos">{POS_LABEL[slot.posKey]}</span>
                   {slot.player ? (
@@ -899,12 +908,12 @@ function WindowDecideScreen({ state, dispatch }) {
     <div className="scene">
       <div className="scene-head">
         <div className="h1">Window {se.window} — {mgr.name}</div>
-        <div className="sub">Sell up to one player this window — any position. Tap a player to mark them for SALE. Identities stay hidden until the reveal.</div>
+        <div className="sub">Sell any of your original picks — replacements signed in a past window (🔒) can't be sold. Tap players to mark them for SALE.</div>
       </div>
       <PitchFormation mgr={mgr} mode="sell" state={state} dispatch={dispatch} />
       <div className="cta-row">
         <span style={{ marginRight: 'auto', alignSelf:'center', color:'var(--text-dim)', fontSize:20 }}>
-          {nSell === 0 ? 'Holding everyone' : '1 marked to sell'}
+          {nSell === 0 ? 'Holding everyone' : `${nSell} marked to sell`}
         </span>
         <button className="btn btn-primary btn-lg" onClick={() => dispatch({ type: 'WINDOW_CONFIRM' })}>
           Confirm {mgr.name}'s window →
