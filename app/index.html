@@ -484,17 +484,18 @@ function reducer(state, action) {
     }
 
     case 'WINDOW_TOGGLE': {
-      const sel = { ...state.windowSel };
-      if (sel[action.playerId]) delete sel[action.playerId]; else sel[action.playerId] = true;
-      return { ...state, windowSel: sel };
+      // Single-select: at most one sale per window. Clicking the chosen player
+      // clears it; clicking another switches the selection.
+      if (state.windowSel[action.playerId]) return { ...state, windowSel: {} };
+      return { ...state, windowSel: { [action.playerId]: true } };
     }
 
     case 'WINDOW_CONFIRM': {
-      // Record sells for current manager
-      const se = curSeason(state);
+      // Record the (at most one) sale for the current manager. Any player in the
+      // squad can be sold this window, not just this window's positions.
       const mgr = state.managers[state.windowMgr];
       const newSold = [];
-      se.positions.forEach(pos => {
+      Object.keys(mgr.squad).forEach(pos => {
         const pid = mgr.squad[pos];
         if (pid && state.windowSel[pid]) {
           newSold.push({ mgrId: mgr.id, pos, player: PLAYER_BY_ID[pid], replacementId: null });
@@ -824,8 +825,8 @@ function PitchFormation({ mgr, mode, state, dispatch }) {
         {cols.map((col, ci) => (
           <div key={ci} className="pitch-col">
             {col.map(slot => {
-              const se = mode === 'sell' ? curSeason(state) : null;
-              const sellable = mode === 'sell' && se.positions.includes(slot.posKey) && slot.player;
+              // Any player in the squad can be sold this window (one per window).
+              const sellable = mode === 'sell' && !!slot.player;
               const isSell = mode === 'sell' && slot.player && state.windowSel[slot.player.id];
               const revealed = mode === 'final' && finalPosRevealed(state, slot.posKey);
               const draftYr = SEASON_SEQUENCE.find(s => s.pos === slot.posKey)?.yr;
@@ -898,12 +899,12 @@ function WindowDecideScreen({ state, dispatch }) {
     <div className="scene">
       <div className="scene-head">
         <div className="h1">Window {se.window} — {mgr.name}</div>
-        <div className="sub">Tap any player to mark them for SALE. Identities stay hidden until the reveal.</div>
+        <div className="sub">Sell up to one player this window — any position. Tap a player to mark them for SALE. Identities stay hidden until the reveal.</div>
       </div>
       <PitchFormation mgr={mgr} mode="sell" state={state} dispatch={dispatch} />
       <div className="cta-row">
         <span style={{ marginRight: 'auto', alignSelf:'center', color:'var(--text-dim)', fontSize:20 }}>
-          {nSell === 0 ? 'Holding everyone' : `${nSell} marked to sell`}
+          {nSell === 0 ? 'Holding everyone' : '1 marked to sell'}
         </span>
         <button className="btn btn-primary btn-lg" onClick={() => dispatch({ type: 'WINDOW_CONFIRM' })}>
           Confirm {mgr.name}'s window →
