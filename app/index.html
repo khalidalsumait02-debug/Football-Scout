@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1920" />
+<title>The Scout</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js"></script>
+<style>
+:root {
+  --bg:        #0d1117;
+  --bg2:       #111a2e;
+  --surface:   #1a2340;
+  --surface2:  #1f2b4a;
+  --line:      rgba(255,255,255,0.08);
+  --line2:     rgba(255,255,255,0.16);
+  --text:      #ffffff;
+  --text-dim:  rgba(255,255,255,0.58);
+  --text-faint:rgba(255,255,255,0.32);
+  --acc:       #c8ff00;
+  --acc-dark:  #9fc900;
+  --acc-glow:  rgba(200,255,0,0.20);
+  --teal:      #00d4b4;
+  --good:      #22c55e;
+  --bad:       #ef4444;
+  --font-d: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --font-u: 'Inter', system-ui, sans-serif;
+  --sidebar-w: 300px;
+  --r: 16px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100vw; height: 100vh; overflow: hidden;
+  background: var(--bg); color: var(--text);
+  font-family: var(--font-u); font-size: 18px;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root { width: 100vw; height: 100vh; display: flex; }
+
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+input { font-family: inherit; }
+
+/* ---------- Typography helpers ---------- */
+.display   { font-family: var(--font-d); font-weight: 800; line-height: 0.88; text-transform: uppercase; letter-spacing: -1px; }
+.h1        { font-family: var(--font-d); font-weight: 700; line-height: 1.0; text-transform: uppercase; }
+.h2        { font-family: var(--font-d); font-weight: 700; }
+.kicker    { font-family: var(--font-d); font-weight: 600; letter-spacing: 3px; text-transform: uppercase; color: var(--text-dim); font-size: 20px; }
+.mono-num  { font-family: var(--font-d); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* ---------- Sidebar ---------- */
+.sidebar {
+  width: var(--sidebar-w); flex-shrink: 0;
+  background: linear-gradient(180deg, var(--surface) 0%, #151d36 100%);
+  border-right: 1px solid var(--line);
+  display: flex; flex-direction: column; padding: 30px 24px; gap: 26px;
+}
+.sidebar.hidden { display: none; }
+.side-brand { font-family: var(--font-d); font-weight: 800; font-size: 34px; text-transform: uppercase; letter-spacing: 1px; }
+.side-brand .dot { color: var(--acc); }
+
+.rail { display: flex; flex-direction: column; gap: 2px; }
+.rail-title { font-size: 13px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-faint); margin-bottom: 10px; font-weight: 700; }
+.rail-step { display: flex; align-items: center; gap: 12px; padding: 6px 0; opacity: 0.5; transition: opacity .3s; }
+.rail-step.active { opacity: 1; }
+.rail-step.done { opacity: 0.75; }
+.rail-bullet { width: 12px; height: 12px; border-radius: 50%; background: var(--text-faint); flex-shrink: 0; }
+.rail-step.active .rail-bullet { background: var(--acc); box-shadow: 0 0 0 5px var(--acc-glow); }
+.rail-step.done .rail-bullet { background: var(--teal); }
+.rail-yr { font-family: var(--font-d); font-weight: 600; font-size: 19px; }
+.rail-pos { margin-left: auto; font-size: 13px; color: var(--text-dim); font-weight: 600; }
+
+.mgr-list { display: flex; flex-direction: column; gap: 10px; margin-top: auto; }
+.mgr-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px solid transparent; transition: all .25s; }
+.mgr-row.current { background: var(--acc-glow); border-color: var(--acc); }
+.avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--surface2); color: var(--text); display: flex; align-items: center; justify-content: center; font-family: var(--font-d); font-weight: 700; font-size: 20px; flex-shrink: 0; }
+.mgr-row.current .avatar { background: var(--acc); color: #0d1117; animation: pulse-ring 1.6s infinite; }
+.mgr-meta { display: flex; flex-direction: column; line-height: 1.1; min-width: 0; }
+.mgr-name { font-weight: 600; font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mgr-sub { font-size: 13px; color: var(--text-dim); }
+
+/* ---------- Main ---------- */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+.scene { flex: 1; display: flex; flex-direction: column; padding: 40px 48px; animation: scene-in .35s ease both; min-height: 0; }
+.scene-full { padding: 0; align-items: center; justify-content: center; }
+
+.scene-head { margin-bottom: 24px; }
+.scene-head .h1 { font-size: 56px; }
+.scene-head .sub { color: var(--text-dim); font-size: 22px; margin-top: 4px; }
+
+/* ---------- Buttons ---------- */
+.btn { font-family: var(--font-d); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border-radius: 12px; padding: 16px 32px; font-size: 24px; transition: transform .12s, box-shadow .2s, background .2s; }
+.btn:active { transform: scale(.97); }
+.btn-primary { background: var(--acc); color: #0d1117; }
+.btn-primary:hover { box-shadow: 0 8px 30px var(--acc-glow); }
+.btn-ghost { background: rgba(255,255,255,0.06); color: var(--text); border: 1px solid var(--line2); }
+.btn-ghost:hover { background: rgba(255,255,255,0.12); }
+.btn-good { background: transparent; color: var(--good); border: 2px solid var(--good); }
+.btn-good:hover { background: rgba(34,197,94,0.12); }
+.btn-bad { background: transparent; color: var(--bad); border: 2px solid var(--bad); }
+.btn-bad:hover { background: rgba(239,68,68,0.12); }
+.btn-lg { font-size: 30px; padding: 22px 48px; }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+
+.cta-row { display: flex; gap: 16px; margin-top: auto; padding-top: 24px; justify-content: flex-end; }
+
+/* ---------- Pos badge ---------- */
+.pos-badge { display: inline-flex; align-items: center; justify-content: center; background: var(--acc); color: #0d1117; font-family: var(--font-d); font-weight: 800; border-radius: 8px; padding: 2px 12px; font-size: 22px; letter-spacing: 1px; }
+.pos-badge.sm { font-size: 16px; padding: 1px 9px; border-radius: 6px; }
+.pos-badge.lg { font-size: 40px; padding: 6px 22px; border-radius: 12px; }
+
+/* ---------- Silhouette ---------- */
+.silh { position: relative; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #2c3a5e, #1a2340); overflow: hidden; flex-shrink: 0; }
+.silh::before { content: ''; position: absolute; left: 50%; top: 20%; width: 38%; height: 38%; border-radius: 50%; background: rgba(255,255,255,0.18); transform: translateX(-50%); }
+.silh::after { content: ''; position: absolute; left: 50%; bottom: -18%; width: 78%; height: 62%; border-radius: 50% 50% 0 0; background: rgba(255,255,255,0.18); transform: translateX(-50%); }
+
+/* ---------- Stat row ---------- */
+.stat-row { display: flex; justify-content: space-between; align-items: baseline; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.stat-row:last-child { border-bottom: none; }
+.stat-lbl { color: var(--teal); font-weight: 600; font-size: 16px; letter-spacing: .3px; }
+.stat-val { font-family: var(--font-d); font-weight: 700; font-size: 30px; }
+
+/* ---------- Setup ---------- */
+.setup-wrap { display: flex; gap: 80px; align-items: center; max-width: 1400px; width: 100%; }
+.setup-left { flex: 1; }
+.setup-left .display { font-size: 130px; }
+.setup-left .tagline { color: var(--text-dim); font-size: 26px; margin-top: 8px; }
+.timeline-strip { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 32px; max-width: 560px; }
+.tl-pill { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 8px 16px; font-family: var(--font-d); font-weight: 600; font-size: 17px; display: flex; gap: 8px; align-items: center; }
+.tl-pill .tl-pos { color: var(--acc); }
+.setup-right { width: 460px; background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 36px; }
+.setup-right h3 { font-family: var(--font-d); font-weight: 700; font-size: 28px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; }
+.mgr-input-row { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+.mgr-input-row input { flex: 1; background: var(--bg); border: 1px solid var(--line2); border-radius: 12px; padding: 14px 16px; color: var(--text); font-size: 20px; font-weight: 500; }
+.mgr-input-row input:focus { outline: none; border-color: var(--acc); }
+.mgr-input-row .rm { width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.06); color: var(--text-dim); font-size: 20px; flex-shrink: 0; }
+.mgr-input-row .rm:hover { background: rgba(239,68,68,0.2); color: var(--bad); }
+.add-mgr { width: 100%; padding: 12px; border: 1px dashed var(--line2); border-radius: 12px; color: var(--text-dim); font-family: var(--font-d); font-weight: 600; font-size: 18px; text-transform: uppercase; letter-spacing: 1px; }
+.add-mgr:hover { border-color: var(--acc); color: var(--acc); }
+.add-mgr:disabled { opacity: .35; }
+
+/* ---------- Announce ---------- */
+.announce { text-align: center; max-width: 1100px; }
+.announce .season-no { color: var(--teal); font-family: var(--font-d); font-weight: 600; letter-spacing: 4px; font-size: 26px; text-transform: uppercase; }
+.announce .big-year { font-family: var(--font-d); font-weight: 800; font-size: 200px; color: var(--acc); line-height: 0.9; margin: 8px 0; }
+.announce .tagline { font-size: 30px; color: var(--text); margin-top: 18px; }
+.announce .stat-preview { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 30px; }
+.announce .sp-pill { background: var(--surface); border: 1px solid var(--line2); border-radius: 999px; padding: 12px 24px; font-family: var(--font-d); font-weight: 600; font-size: 22px; color: var(--teal); }
+.rise { animation: rise .5s ease both; }
+
+/* ---------- Draft ---------- */
+.draft-cards { display: flex; gap: 18px; flex: 1; align-items: stretch; min-height: 0; }
+.draft-card { flex: 1; background: var(--surface); border-radius: var(--r); border: 2px solid var(--line2); display: flex; flex-direction: column; padding: 22px 20px; cursor: pointer; transition: transform .15s, box-shadow .15s, border-color .15s; position: relative; overflow: hidden; }
+.draft-card:hover:not(.drafted) { transform: translateY(-10px); box-shadow: 0 24px 60px rgba(0,0,0,0.5); border-color: var(--acc); }
+.draft-card.drafted { opacity: .3; pointer-events: none; filter: grayscale(.7); }
+.draft-card.out { animation: drafted-out .55s cubic-bezier(.5,0,.75,0) both; }
+.dc-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.dc-num { width: 30px; height: 30px; border-radius: 8px; background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-family: var(--font-d); font-weight: 700; font-size: 18px; color: var(--text-dim); }
+.dc-val { font-family: var(--font-d); font-weight: 800; font-size: 50px; text-align: center; margin: 2px 0 12px; }
+.dc-silh { width: 92px; height: 92px; margin: 0 auto 14px; }
+.dc-stats { margin-top: auto; }
+.drafted-stamp { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.drafted-stamp span { font-family: var(--font-d); font-weight: 800; font-size: 30px; color: var(--text); border: 3px solid var(--text); padding: 4px 16px; border-radius: 8px; transform: rotate(-12deg); letter-spacing: 2px; }
+
+.pick-confirm { position: absolute; inset: 0; background: rgba(13,17,23,0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 20px; text-align: center; z-index: 5; animation: scene-in .2s ease both; }
+.pick-confirm .pc-q { font-family: var(--font-d); font-weight: 700; font-size: 26px; }
+.pick-confirm .pc-mgr { color: var(--acc); }
+.pick-confirm .pc-btns { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+
+/* ---------- Pitch ---------- */
+.pitch-wrap { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.pitch { flex: 1; background: linear-gradient(180deg, #1a5c2a 0%, #134420 100%); border-radius: 20px; position: relative; padding: 30px 40px; display: flex; gap: 12px; overflow: hidden; min-height: 0; }
+.pitch::before { content: ''; position: absolute; inset: 16px; border: 2px solid rgba(255,255,255,0.25); border-radius: 12px; pointer-events: none; }
+.pitch::after { content: ''; position: absolute; left: 16px; right: 16px; top: 50%; height: 0; border-top: 2px solid rgba(255,255,255,0.18); pointer-events: none; }
+.pitch-col { flex: 1; display: flex; flex-direction: column; justify-content: space-around; align-items: center; gap: 10px; position: relative; z-index: 1; }
+.pitch-slot { display: flex; flex-direction: column; align-items: center; gap: 6px; transition: transform .3s; }
+.pitch-slot.clickable { cursor: pointer; }
+.pitch-slot.clickable:hover { transform: scale(1.06); }
+.slot-circle { width: 76px; height: 76px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--font-d); font-weight: 700; font-size: 22px; border: 2px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.12); color: #fff; position: relative; transition: all .3s; }
+.pitch-slot.empty .slot-circle { border-style: dashed; background: rgba(0,0,0,0.18); color: rgba(255,255,255,0.6); }
+.pitch-slot.filled .slot-circle { background: var(--acc); color: #0d1117; border-color: var(--acc); box-shadow: 0 0 0 6px var(--acc-glow); }
+.pitch-slot.sell .slot-circle { background: var(--bad); color: #fff; border-color: var(--bad); box-shadow: 0 0 0 6px rgba(239,68,68,0.3); }
+.slot-silh { width: 54px; height: 54px; }
+.slot-pos { font-family: var(--font-d); font-weight: 700; font-size: 16px; color: #fff; background: rgba(0,0,0,0.35); padding: 1px 8px; border-radius: 6px; }
+.slot-val { font-family: var(--font-d); font-weight: 700; font-size: 22px; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.5); }
+.slot-name { font-family: var(--font-d); font-weight: 700; font-size: 18px; color: #fff; text-align: center; max-width: 110px; animation: rise .4s ease both; }
+.slot-year { font-size: 13px; color: rgba(255,255,255,0.6); }
+.pitch-total { display: flex; justify-content: space-between; align-items: center; padding: 18px 28px; background: var(--surface); border-radius: 14px; margin-top: 14px; }
+.pitch-total .lbl { font-family: var(--font-d); font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); font-size: 20px; }
+.pitch-total .amt { font-family: var(--font-d); font-weight: 800; font-size: 48px; }
+
+/* ---------- Window reveal ---------- */
+.reveal-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; text-align: center; }
+.rv-card { background: var(--surface); border: 2px solid var(--line2); border-radius: 20px; padding: 40px 60px; min-width: 480px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.rv-silh { width: 140px; height: 140px; }
+.rv-name { font-family: var(--font-d); font-weight: 800; font-size: 56px; text-transform: uppercase; animation: id-flip .5s ease both; }
+.rv-club { color: var(--text-dim); font-size: 22px; }
+.rv-line { display: flex; align-items: baseline; gap: 16px; font-family: var(--font-d); }
+.rv-line .l { color: var(--text-dim); font-weight: 600; font-size: 24px; }
+.rv-line .v { font-weight: 800; font-size: 56px; }
+.rv-profit { font-family: var(--font-d); font-weight: 800; font-size: 90px; animation: pop-in .5s ease both; }
+.rv-profit.good { color: var(--good); } .rv-profit.bad { color: var(--bad); }
+.rv-profit-lbl { font-family: var(--font-d); font-weight: 600; letter-spacing: 4px; text-transform: uppercase; color: var(--text-dim); font-size: 24px; }
+.shelf-row { display: flex; gap: 24px; justify-content: center; margin-top: 8px; }
+.shelf-card { background: var(--surface); border: 2px solid var(--line2); border-radius: 16px; padding: 24px; width: 220px; display: flex; flex-direction: column; align-items: center; gap: 10px; cursor: pointer; transition: all .15s; }
+.shelf-card:hover { border-color: var(--acc); transform: translateY(-6px); }
+.shelf-card.picked { border-color: var(--acc); background: var(--acc-glow); }
+.shelf-silh { width: 80px; height: 80px; }
+
+/* ---------- Standings ---------- */
+.podium-row { display: flex; align-items: flex-end; justify-content: center; gap: 24px; margin-bottom: 40px; }
+.podium { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.podium .pod-av { width: 80px; height: 80px; font-size: 34px; }
+.podium .pod-block { background: var(--surface); border-radius: 14px 14px 0 0; width: 200px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 18px; border: 1px solid var(--line2); border-bottom: none; }
+.podium.p1 .pod-block { height: 220px; border-color: var(--acc); background: linear-gradient(180deg, var(--acc-glow), var(--surface)); }
+.podium.p2 .pod-block { height: 160px; }
+.podium.p3 .pod-block { height: 120px; }
+.podium .pod-rank { font-family: var(--font-d); font-weight: 800; font-size: 56px; color: var(--acc); }
+.podium .pod-name { font-family: var(--font-d); font-weight: 700; font-size: 24px; }
+.podium .pod-score { font-family: var(--font-d); font-weight: 800; font-size: 32px; }
+.standings-table { width: 100%; max-width: 1100px; margin: 0 auto; border-collapse: collapse; }
+.standings-table th { text-align: left; font-family: var(--font-d); font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); font-size: 16px; padding: 12px 18px; border-bottom: 1px solid var(--line2); }
+.standings-table td { padding: 16px 18px; border-bottom: 1px solid var(--line); font-size: 22px; }
+.standings-table .num { font-family: var(--font-d); font-weight: 700; font-variant-numeric: tabular-nums; }
+.standings-table tr.win td { background: var(--acc-glow); }
+.win-banner { text-align: center; }
+.win-banner .display { font-size: 110px; color: var(--acc); }
+
+.hint { color: var(--text-faint); font-size: 16px; margin-top: 10px; text-align: center; }
+
+/* ---------- Animations ---------- */
+@keyframes scene-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@keyframes drafted-out { to { opacity: 0; transform: translateX(70px) rotate(5deg); flex-grow: 0.01; padding-left: 0; padding-right: 0; } }
+@keyframes id-flip { from { transform: rotateY(90deg); opacity: 0; } to { transform: rotateY(0); opacity: 1; } }
+@keyframes pop-in { 0% { transform: scale(.5); opacity: 0; } 70% { transform: scale(1.12); } 100% { transform: scale(1); opacity: 1; } }
+@keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 var(--acc-glow); } 70% { box-shadow: 0 0 0 12px rgba(200,255,0,0); } 100% { box-shadow: 0 0 0 0 rgba(200,255,0,0); } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { useReducer, useState, useEffect, useRef, useCallback } = React;
+
+/* =========================================================================
+   DATA
+   ========================================================================= */
+
+// Position display order of stats for each round.
+const STAT_KEYS = {
+  CB:  ['Age', 'Yellow Cards', 'Goals', 'League Clean Sheets'],
+  WF:  ['Age', 'League G+A', 'League', 'UCL G+A'],
+  DM:  ['Yellow Cards', 'Assists', 'League', 'League G+A'],
+  GK:  ['Saves / Game', 'League Clean Sheets', 'Pens Saved', 'League'],
+  ST:  ['League Goals', 'National Caps', 'League', 'Height'],
+  AM:  ['League Assists', 'UCL Assists', 'Total Goals', 'National Caps'],
+  CB2: ['Age', 'Yellow Cards', 'Goals', 'League Clean Sheets'],
+};
+
+// p(id, name, club, buyVal, sellVal, curVal, stats)
+function mk(pos, id, name, club, buyVal, sellVal, curVal, stats) {
+  return { id, name, pos, club, buyVal, sellVal, curVal, stats, statKeys: STAT_KEYS[pos] };
+}
+
+const DRAFT_POOLS = {
+  CB: [
+    mk('CB','stones','John Stones','Man City',50,48,35,{'Age':22,'Yellow Cards':3,'Goals':1,'League Clean Sheets':15}),
+    mk('CB','rudiger','Antonio Rüdiger','Chelsea',9,12,25,{'Age':23,'Yellow Cards':5,'Goals':2,'League Clean Sheets':12}),
+    mk('CB','saliba','William Saliba','Saint-Étienne',15,18,90,{'Age':15,'Yellow Cards':2,'Goals':0,'League Clean Sheets':8}),
+    mk('CB','sule','Niklas Süle','Hoffenheim',10,14,8,{'Age':21,'Yellow Cards':4,'Goals':1,'League Clean Sheets':14}),
+    mk('CB','kimpembe','Presnel Kimpembe','PSG',12,15,5,{'Age':21,'Yellow Cards':6,'Goals':0,'League Clean Sheets':11}),
+  ],
+  WF: [
+    mk('WF','salah','Mohamed Salah','Liverpool',43,150,150,{'Age':25,'League G+A':44,'League':'Premier League','UCL G+A':10}),
+    mk('WF','diaz','Luis Díaz','Junior',1.5,45,75,{'Age':20,'League G+A':8,'League':'Colombia Primera','UCL G+A':0}),
+    mk('WF','sane','Leroy Sané','Man City',37,80,30,{'Age':21,'League G+A':25,'League':'Premier League','UCL G+A':4}),
+    mk('WF','dembele','Ousmane Dembélé','Barcelona',135,110,25,{'Age':20,'League G+A':8,'League':'La Liga','UCL G+A':3}),
+    mk('WF','mane','Sadio Mané','Liverpool',30,90,15,{'Age':25,'League G+A':24,'League':'Premier League','UCL G+A':6}),
+  ],
+  DM: [
+    mk('DM','tonali','Sandro Tonali','Brescia',8,55,45,{'Yellow Cards':8,'Assists':3,'League':'Serie B','League G+A':5}),
+    mk('DM','tchouameni','Aurélien Tchouaméni','Bordeaux',1,40,70,{'Yellow Cards':4,'Assists':2,'League':'Ligue 2','League G+A':3}),
+    mk('DM','rice','Declan Rice','West Ham',6,60,100,{'Yellow Cards':7,'Assists':2,'League':'Premier League','League G+A':3}),
+    mk('DM','rodri','Rodri','Atlético Madrid',20,70,100,{'Yellow Cards':8,'Assists':5,'League':'La Liga','League G+A':6}),
+    mk('DM','guendouzi','Matteo Guendouzi','Arsenal',8,30,15,{'Yellow Cards':7,'Assists':3,'League':'Premier League','League G+A':4}),
+  ],
+  GK: [
+    mk('GK','martinez','Emiliano Martínez','Aston Villa',20,28,20,{'Saves / Game':3.4,'League Clean Sheets':11,'Pens Saved':3,'League':'Premier League'}),
+    mk('GK','mendy','Édouard Mendy','Chelsea',24,30,8,{'Saves / Game':2.8,'League Clean Sheets':16,'Pens Saved':1,'League':'Premier League'}),
+    mk('GK','maignan','Mike Maignan','Lille',15,35,30,{'Saves / Game':3.1,'League Clean Sheets':19,'Pens Saved':2,'League':'Ligue 1'}),
+    mk('GK','costa','Diogo Costa','Porto',3,30,40,{'Saves / Game':3.5,'League Clean Sheets':12,'Pens Saved':4,'League':'Primeira Liga'}),
+    mk('GK','hradecky','Lukáš Hrádecký','Leverkusen',4,8,6,{'Saves / Game':2.9,'League Clean Sheets':15,'Pens Saved':1,'League':'Bundesliga'}),
+  ],
+  ST: [
+    mk('ST','haaland','Erling Haaland','Dortmund',63,150,200,{'League Goals':22,'National Caps':21,'League':'Bundesliga','Height':'194cm'}),
+    mk('ST','gyokeres','Viktor Gyökeres','Coventry',6,55,90,{'League Goals':17,'National Caps':18,'League':'Championship','Height':'187cm'}),
+    mk('ST','isak','Alexander Isak','Real Sociedad',18,60,80,{'League Goals':19,'National Caps':28,'League':'La Liga','Height':'190cm'}),
+    mk('ST','adeyemi','Karim Adeyemi','Salzburg',30,45,30,{'League Goals':18,'National Caps':9,'League':'Austrian Bundesliga','Height':'180cm'}),
+    mk('ST','nunez','Darwin Núñez','Benfica',55,90,70,{'League Goals':26,'National Caps':28,'League':'Primeira Liga','Height':'187cm'}),
+  ],
+  AM: [
+    mk('AM','guler','Arda Güler','Fenerbahçe',10,45,90,{'League Assists':9,'UCL Assists':0,'Total Goals':5,'National Caps':5}),
+    mk('AM','bellingham','Jude Bellingham','Dortmund',103,150,200,{'League Assists':14,'UCL Assists':4,'Total Goals':23,'National Caps':28}),
+    mk('AM','pedri','Pedri','Barcelona',80,90,80,{'League Assists':9,'UCL Assists':2,'Total Goals':7,'National Caps':30}),
+    mk('AM','gavi','Gavi','Barcelona',60,75,50,{'League Assists':10,'UCL Assists':1,'Total Goals':4,'National Caps':32}),
+    mk('AM','wirtz','Florian Wirtz','Leverkusen',40,100,150,{'League Assists':13,'UCL Assists':3,'Total Goals':20,'National Caps':20}),
+  ],
+  CB2: [
+    mk('CB2','bastoni','Alessandro Bastoni','Inter',65,72,75,{'Age':25,'Yellow Cards':4,'Goals':2,'League Clean Sheets':17}),
+    mk('CB2','yoro','Leny Yoro','Lille',62,64,60,{'Age':18,'Yellow Cards':2,'Goals':1,'League Clean Sheets':8}),
+    mk('CB2','lukeba','Castello Lukeba','RB Leipzig',40,42,40,{'Age':21,'Yellow Cards':5,'Goals':1,'League Clean Sheets':12}),
+    mk('CB2','lacroix','Maxence Lacroix','Wolfsburg',18,20,20,{'Age':24,'Yellow Cards':7,'Goals':2,'League Clean Sheets':10}),
+    mk('CB2','solet','Oumar Solet','RB Salzburg',12,16,18,{'Age':24,'Yellow Cards':3,'Goals':1,'League Clean Sheets':14}),
+  ],
+};
+
+const PLAYER_BY_ID = {};
+Object.values(DRAFT_POOLS).forEach(pool => pool.forEach(p => { PLAYER_BY_ID[p.id] = p; }));
+
+const SEASON_SEQUENCE = [
+  { step:0, yr:'2016/17', type:'draft',  pos:'CB',  label:'Centre Back' },
+  { step:1, yr:'2017/18', type:'draft',  pos:'WF',  label:'Winger' },
+  { step:2, yr:'2018/19', type:'draft',  pos:'DM',  label:'Defensive Mid' },
+  { step:3, yr:'2019/20', type:'window', window:1,  positions:['CB','WF','DM'], label:'Transfer Window' },
+  { step:4, yr:'2020/21', type:'draft',  pos:'GK',  label:'Goalkeeper' },
+  { step:5, yr:'2021/22', type:'draft',  pos:'ST',  label:'Striker' },
+  { step:6, yr:'2022/23', type:'draft',  pos:'AM',  label:'Attacking Mid' },
+  { step:7, yr:'2023/24', type:'window', window:2,  positions:['GK','ST','AM'], label:'Transfer Window' },
+  { step:8, yr:'2024/25', type:'draft',  pos:'CB2', label:'Centre Back #2' },
+  { step:9, yr:'2025/26', type:'reveal', label:'Final Reveal' },
+];
+
+// Order positions are revealed back-to-front on the pitch.
+const PITCH_ORDER = ['GK','CB','CB2','DM','AM','WF','ST'];
+const POS_LABEL = { GK:'GK', CB:'CB', CB2:'CB', DM:'DM', AM:'AM', WF:'WF', ST:'ST' };
+
+/* =========================================================================
+   HELPERS + HOOKS
+   ========================================================================= */
+
+function fmtM(v) {
+  if (v == null) return '€?M';
+  const neg = v < 0; const a = Math.abs(v);
+  let s;
+  if (a < 10 && a % 1 !== 0) s = a.toFixed(1);
+  else s = Math.round(a).toString();
+  return (neg ? '−€' : '€') + s + 'M';
+}
+
+function useCountUp(target, run, ms = 800) {
+  const [val, setVal] = useState(run ? 0 : target);
+  useEffect(() => {
+    if (!run) { setVal(target); return; }
+    let raf, start;
+    const from = 0;
+    const tick = (t) => {
+      if (start == null) start = t;
+      const k = Math.min(1, (t - start) / ms);
+      const e = 1 - Math.pow(1 - k, 3);
+      setVal(from + (target - from) * e);
+      if (k < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, run, ms]);
+  return val;
+}
+
+function useTween(target, ms = 650) {
+  const [val, setVal] = useState(target);
+  const fromRef = useRef(target);
+  useEffect(() => {
+    const from = fromRef.current;
+    let raf, start;
+    const tick = (t) => {
+      if (start == null) start = t;
+      const k = Math.min(1, (t - start) / ms);
+      const e = 1 - Math.pow(1 - k, 3);
+      const cur = from + (target - from) * e;
+      setVal(cur);
+      if (k < 1) raf = requestAnimationFrame(tick);
+      else fromRef.current = target;
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, ms]);
+  return val;
+}
+
+// Scoring
+function squadValue(mgr) {
+  return Object.values(mgr.squad).reduce((sum, pid) => sum + (pid ? PLAYER_BY_ID[pid].curVal : 0), 0);
+}
+function scoreOf(mgr) {
+  return squadValue(mgr) - mgr.totalSpent + mgr.bankedProfit;
+}
+
+/* =========================================================================
+   REDUCER
+   ========================================================================= */
+
+const initial = {
+  state: 'SETUP',
+  seasonStep: 0,
+  managers: [],
+  shelf: {},          // { pos: [player, ...] }  remaining undrafted cards
+  draftIdx: 0,        // which manager is picking this round
+  picking: null,      // card index pending confirmation
+  outIdx: null,       // card index animating out
+  windowMgr: 0,       // current manager in window decide
+  windowSel: {},      // { playerId: true } toggled-for-sale (current manager)
+  sold: [],           // [{ mgrId, pos, player, replacementId|null }]
+  revealIdx: 0,       // window reveal: which sold player
+  revealStage: 0,     // window reveal: 0..6
+  finalIdx: -1,       // final reveal: index into PITCH_ORDER (per-position aggregated)
+  finalProfit: false, // whether banked profits added on final screen
+  standRevealed: 0,   // standings rows revealed
+};
+
+function curSeason(s) { return SEASON_SEQUENCE[s.seasonStep]; }
+
+function reducer(state, action) {
+  switch (action.type) {
+    case 'START': {
+      const managers = action.managers.map((name, i) => ({
+        id: 'm' + i, name, squad: { CB:null,WF:null,DM:null,GK:null,ST:null,AM:null,CB2:null },
+        totalSpent: 0, bankedProfit: 0,
+      }));
+      return { ...initial, managers, state: 'ANNOUNCE', seasonStep: 0 };
+    }
+
+    case 'ANNOUNCE_DONE': {
+      const se = curSeason(state);
+      if (se.type === 'window') return { ...state, state: 'WINDOW_DECIDE', windowMgr: 0, windowSel: {} };
+      return { ...state, state: 'DRAFT', draftIdx: 0, picking: null, outIdx: null };
+    }
+
+    case 'PICK_INTENT':
+      return { ...state, picking: action.cardIdx };
+    case 'PICK_CANCEL':
+      return { ...state, picking: null };
+
+    case 'PICK_CONFIRM': {
+      const se = curSeason(state);
+      const pos = se.pos;
+      const pool = DRAFT_POOLS[pos];
+      const card = pool[action.cardIdx];
+      const mgr = state.managers[state.draftIdx];
+      const managers = state.managers.map((m, i) =>
+        i === state.draftIdx
+          ? { ...m, squad: { ...m.squad, [pos]: card.id }, totalSpent: m.totalSpent + card.buyVal }
+          : m
+      );
+      return { ...state, managers, picking: null, outIdx: action.cardIdx };
+    }
+
+    case 'PICK_OUT_DONE': {
+      const se = curSeason(state);
+      const pos = se.pos;
+      const nextIdx = state.draftIdx + 1;
+      if (nextIdx < state.managers.length) {
+        return { ...state, draftIdx: nextIdx, outIdx: null };
+      }
+      // round done -> compute shelf (undrafted), go to squad
+      const pickedIds = state.managers.map(m => m.squad[pos]);
+      const shelf = { ...state.shelf, [pos]: DRAFT_POOLS[pos].filter(p => !pickedIds.includes(p.id)) };
+      return { ...state, shelf, outIdx: null, state: 'SQUAD' };
+    }
+
+    case 'SQUAD_DONE': {
+      const next = SEASON_SEQUENCE[state.seasonStep + 1];
+      if (!next || next.type === 'reveal')
+        return { ...state, seasonStep: state.seasonStep + 1, state: 'FINAL_REVEAL', finalIdx: -1 };
+      return { ...state, seasonStep: state.seasonStep + 1, state: 'ANNOUNCE' };
+    }
+
+    case 'WINDOW_TOGGLE': {
+      const sel = { ...state.windowSel };
+      if (sel[action.playerId]) delete sel[action.playerId]; else sel[action.playerId] = true;
+      return { ...state, windowSel: sel };
+    }
+
+    case 'WINDOW_CONFIRM': {
+      // Record sells for current manager
+      const se = curSeason(state);
+      const mgr = state.managers[state.windowMgr];
+      const newSold = [];
+      se.positions.forEach(pos => {
+        const pid = mgr.squad[pos];
+        if (pid && state.windowSel[pid]) {
+          newSold.push({ mgrId: mgr.id, pos, player: PLAYER_BY_ID[pid], replacementId: null });
+        }
+      });
+      const sold = [...state.sold, ...newSold];
+      const nextMgr = state.windowMgr + 1;
+      if (nextMgr < state.managers.length) {
+        return { ...state, sold, windowMgr: nextMgr, windowSel: {} };
+      }
+      // all managers decided
+      if (sold.length === 0) {
+        // nothing sold -> straight to squad
+        return { ...state, sold, state: 'SQUAD' };
+      }
+      return { ...state, sold, state: 'WINDOW_REVEAL', revealIdx: 0, revealStage: 0 };
+    }
+
+    case 'REVEAL_NEXT': {
+      const item = state.sold[state.revealIdx];
+      const hasShelf = (state.shelf[item.pos] || []).length > 0;
+      const maxStage = hasShelf ? 6 : 2; // if no replacement options, skip shelf stages (still show profit at 2->we map)
+      // Stages: 0 buy,1 sell,2 identity,3 shelf silh,4 shelf vals,5 shelf id,6 profit
+      // If no shelf -> 0 buy,1 sell,2 identity, then jump to profit handled separately
+      if (!hasShelf) {
+        if (state.revealStage < 2) return { ...state, revealStage: state.revealStage + 1 };
+        if (state.revealStage === 2) return { ...state, revealStage: 6 }; // profit
+        // profit shown -> next sold or squad
+        return advanceSold(state);
+      }
+      if (state.revealStage < 6) return { ...state, revealStage: state.revealStage + 1 };
+      return advanceSold(state);
+    }
+
+    case 'REVEAL_PICK_REPLACEMENT': {
+      // record replacement on the sold item; charge spend; remove from shelf
+      const item = state.sold[state.revealIdx];
+      const repl = PLAYER_BY_ID[action.playerId];
+      const sold = state.sold.map((s, i) => i === state.revealIdx ? { ...s, replacementId: action.playerId } : s);
+      const managers = state.managers.map(m => {
+        if (m.id !== item.mgrId) return m;
+        const banked = m.bankedProfit + (item.player.sellVal - item.player.buyVal);
+        return {
+          ...m,
+          squad: { ...m.squad, [item.pos]: action.playerId },
+          // recover the sold player's buy price, charge the replacement's
+          totalSpent: m.totalSpent - item.player.buyVal + repl.buyVal,
+          bankedProfit: banked,
+        };
+      });
+      const shelf = { ...state.shelf, [item.pos]: state.shelf[item.pos].filter(p => p.id !== action.playerId) };
+      return { ...state, sold, managers, shelf };
+    }
+
+    case 'FINAL_NEXT': {
+      if (state.finalIdx < PITCH_ORDER.length - 1) return { ...state, finalIdx: state.finalIdx + 1 };
+      if (!state.finalProfit) return { ...state, finalProfit: true };
+      return { ...state, state: 'STANDINGS', standRevealed: 0 };
+    }
+
+    case 'STAND_NEXT':
+      return { ...state, standRevealed: Math.min(state.standRevealed + 1, state.managers.length) };
+
+    case 'PLAY_AGAIN':
+      return { ...initial };
+
+    default:
+      return state;
+  }
+}
+
+// helper used inside reducer: advance to next sold player or to squad
+function advanceSold(state) {
+  const nextIdx = state.revealIdx + 1;
+  if (nextIdx < state.sold.length) return { ...state, revealIdx: nextIdx, revealStage: 0 };
+  // For sold players with no replacement chosen yet (sold but didn't pick), still bank profit.
+  // Bank any not-yet-banked profits (sold without replacement).
+  let managers = state.managers;
+  state.sold.forEach(item => {
+    if (item.replacementId == null) {
+      managers = managers.map(m => {
+        if (m.id !== item.mgrId) return m;
+        // only bank+empty if this player still in squad (means no replacement chosen)
+        if (m.squad[item.pos] === item.player.id) {
+          return {
+            ...m,
+            squad: { ...m.squad, [item.pos]: null },
+            // recover the sold player's buy price; bank the net profit
+            totalSpent: m.totalSpent - item.player.buyVal,
+            bankedProfit: m.bankedProfit + (item.player.sellVal - item.player.buyVal),
+          };
+        }
+        return m;
+      });
+    }
+  });
+  return { ...state, managers, state: 'SQUAD' };
+}
+
+/* =========================================================================
+   SHARED COMPONENTS
+   ========================================================================= */
+
+function PosBadge({ pos, size }) {
+  return <span className={'pos-badge' + (size ? ' ' + size : '')}>{POS_LABEL[pos] || pos}</span>;
+}
+
+function Silhouette({ className }) { return <div className={'silh ' + (className || '')} />; }
+
+function StatRow({ label, value }) {
+  return (
+    <div className="stat-row">
+      <span className="stat-lbl">{label}</span>
+      <span className="stat-val">{value}</span>
+    </div>
+  );
+}
+
+function Money({ value, run, ms, className }) {
+  const v = useCountUp(value, run, ms);
+  return <span className={'mono-num ' + (className || '')}>{fmtM(v)}</span>;
+}
+
+/* =========================================================================
+   SIDEBAR
+   ========================================================================= */
+
+function Sidebar({ state }) {
+  const cur = state.seasonStep;
+  return (
+    <aside className="sidebar">
+      <div className="side-brand">THE<span className="dot">.</span>SCOUT</div>
+      <div className="rail">
+        <div className="rail-title">Seasons</div>
+        {SEASON_SEQUENCE.map(s => (
+          <div key={s.step} className={'rail-step' + (s.step === cur ? ' active' : s.step < cur ? ' done' : '')}>
+            <span className="rail-bullet" />
+            <span className="rail-yr">{s.yr}</span>
+            <span className="rail-pos">{s.type === 'draft' ? POS_LABEL[s.pos] : s.type === 'window' ? 'WINDOW' : 'REVEAL'}</span>
+          </div>
+        ))}
+      </div>
+      <div className="mgr-list">
+        {state.managers.map((m, i) => {
+          const isCurrent = (state.state === 'DRAFT' && i === state.draftIdx) ||
+                            (state.state === 'WINDOW_DECIDE' && i === state.windowMgr);
+          return (
+            <div key={m.id} className={'mgr-row' + (isCurrent ? ' current' : '')}>
+              <div className="avatar">{m.name.charAt(0).toUpperCase()}</div>
+              <div className="mgr-meta">
+                <span className="mgr-name">{m.name}</span>
+                <span className="mgr-sub">Banked {fmtM(m.bankedProfit)}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </aside>
+  );
+}
+
+/* =========================================================================
+   SCREENS
+   ========================================================================= */
+
+function SetupScreen({ dispatch }) {
+  const [names, setNames] = useState(['', '']);
+  const valid = names.filter(n => n.trim()).length >= 2;
+  const update = (i, v) => setNames(names.map((n, j) => j === i ? v : n));
+  const add = () => names.length < 4 && setNames([...names, '']);
+  const remove = (i) => names.length > 2 && setNames(names.filter((_, j) => j !== i));
+  const start = () => valid && dispatch({ type: 'START', managers: names.map(n => n.trim()).filter(Boolean) });
+
+  return (
+    <div className="scene scene-full">
+      <div className="setup-wrap">
+        <div className="setup-left">
+          <div className="display">The<br/>Scout</div>
+          <div className="tagline">Invest blind. 7 drafts · 2 windows · 1 reveal.</div>
+          <div className="timeline-strip">
+            {SEASON_SEQUENCE.map(s => (
+              <div key={s.step} className="tl-pill">
+                <span>{s.yr}</span>
+                <span className="tl-pos">{s.type === 'draft' ? POS_LABEL[s.pos] : s.type === 'window' ? '⇄' : '★'}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="setup-right">
+          <h3>Managers</h3>
+          {names.map((n, i) => (
+            <div key={i} className="mgr-input-row">
+              <div className="avatar">{(n.trim()[0] || (i+1)).toString().toUpperCase()}</div>
+              <input value={n} placeholder={'Manager ' + (i+1)} maxLength={16}
+                     onChange={e => update(i, e.target.value)}
+                     onKeyDown={e => e.key === 'Enter' && start()} autoFocus={i === 0} />
+              {names.length > 2 && <button className="rm" onClick={() => remove(i)}>×</button>}
+            </div>
+          ))}
+          {names.length < 4 && <button className="add-mgr" onClick={add}>+ Add Manager</button>}
+          <div style={{ marginTop: 24 }}>
+            <button className="btn btn-primary btn-lg" style={{ width: '100%' }} disabled={!valid} onClick={start}>
+              Start Game
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AnnounceScreen({ state, dispatch }) {
+  const se = curSeason(state);
+  const isWindow = se.type === 'window';
+  const yearNum = useCountUp(parseInt(se.yr), true, 700);
+  const advance = () => dispatch({ type: 'ANNOUNCE_DONE' });
+  useKey(' ', advance); useKey('Enter', advance);
+
+  const statKeys = !isWindow ? STAT_KEYS[se.pos] : null;
+  return (
+    <div className="scene scene-full" onClick={advance}>
+      <div className="announce">
+        <div className="season-no rise">Season {se.step + 1} · {se.yr}</div>
+        <div className="big-year">{Math.round(yearNum)}/{(Math.round(yearNum)+1).toString().slice(2)}</div>
+        <div className="rise" style={{ animationDelay: '.1s' }}>
+          {isWindow
+            ? <PosBadge pos="⇄" size="lg" />
+            : <span className="pos-badge lg">{POS_LABEL[se.pos]}</span>}
+        </div>
+        <div className="tagline rise" style={{ animationDelay: '.2s' }}>
+          {isWindow ? `Transfer Window ${se.window} — hold or cash out` : `Time to scout a ${se.label}`}
+        </div>
+        {!isWindow && (
+          <div className="stat-preview">
+            {statKeys.map((k, i) => (
+              <div key={k} className="sp-pill rise" style={{ animationDelay: (0.3 + i*0.08) + 's' }}>{k}</div>
+            ))}
+          </div>
+        )}
+        <div className="hint">Click anywhere or press Space →</div>
+      </div>
+    </div>
+  );
+}
+
+function DraftScreen({ state, dispatch }) {
+  const se = curSeason(state);
+  const pos = se.pos;
+  const pool = DRAFT_POOLS[pos];
+  const mgr = state.managers[state.draftIdx];
+  const pickedThisRound = state.managers.slice(0, state.draftIdx).map(m => m.squad[pos]);
+
+  // handle out animation completion
+  useEffect(() => {
+    if (state.outIdx != null) {
+      const t = setTimeout(() => dispatch({ type: 'PICK_OUT_DONE' }), 560);
+      return () => clearTimeout(t);
+    }
+  }, [state.outIdx]);
+
+  const intent = (i) => { if (!pickedThisRound.includes(pool[i].id) && state.outIdx == null) dispatch({ type: 'PICK_INTENT', cardIdx: i }); };
+  // keyboard 1-5
+  useEffect(() => {
+    const h = (e) => {
+      if (state.picking != null) return;
+      const n = parseInt(e.key);
+      if (n >= 1 && n <= 5) intent(n - 1);
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  });
+
+  return (
+    <div className="scene">
+      <div className="scene-head">
+        <div className="h1">The Board</div>
+        <div className="sub"><span style={{color:'var(--acc)',fontWeight:700}}>{mgr.name}</span> — pick your {se.label}. Stats only, no names.</div>
+      </div>
+      <div className="draft-cards">
+        {pool.map((p, i) => {
+          const drafted = pickedThisRound.includes(p.id);
+          const out = state.outIdx === i;
+          return (
+            <div key={p.id}
+                 className={'draft-card' + (drafted ? ' drafted' : '') + (out ? ' out' : '')}
+                 onClick={() => intent(i)}>
+              <div className="dc-top">
+                <PosBadge pos={pos} />
+                <div className="dc-num">{i + 1}</div>
+              </div>
+              <div className="dc-val">{fmtM(p.buyVal)}</div>
+              <Silhouette className="dc-silh" />
+              <div className="dc-stats">
+                {p.statKeys.map(k => <StatRow key={k} label={k} value={p.stats[k]} />)}
+              </div>
+              {drafted && <div className="drafted-stamp"><span>Drafted</span></div>}
+              {state.picking === i && (
+                <div className="pick-confirm" onClick={e => e.stopPropagation()}>
+                  <div className="pc-q">Confirm pick for<br/><span className="pc-mgr">{mgr.name}</span>?</div>
+                  <div className="pc-btns">
+                    <button className="btn btn-primary" onClick={() => dispatch({ type: 'PICK_CONFIRM', cardIdx: i })}>Yes, draft</button>
+                    <button className="btn btn-ghost" onClick={() => dispatch({ type: 'PICK_CANCEL' })}>Cancel</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div className="hint">Press 1–5 to choose · click a card to draft for {mgr.name}</div>
+    </div>
+  );
+}
+
+// Build pitch slot data for a manager
+function pitchSlots(mgr, opts = {}) {
+  const cols = [
+    ['GK'],
+    ['CB', 'CB2'],
+    ['DM'],
+    ['AM'],
+    ['WF', 'ST'],
+  ];
+  return cols.map(col => col.map(posKey => {
+    const pid = mgr.squad[posKey];
+    return { posKey, player: pid ? PLAYER_BY_ID[pid] : null };
+  }));
+}
+
+function PitchFormation({ mgr, mode, state, dispatch }) {
+  // mode: 'view' | 'sell'
+  const cols = pitchSlots(mgr);
+  const total = useTween(squadValue(mgr));
+
+  return (
+    <div className="pitch-wrap">
+      <div className="pitch">
+        {cols.map((col, ci) => (
+          <div key={ci} className="pitch-col">
+            {col.map(slot => {
+              const se = mode === 'sell' ? curSeason(state) : null;
+              const sellable = mode === 'sell' && se.positions.includes(slot.posKey) && slot.player;
+              const isSell = mode === 'sell' && slot.player && state.windowSel[slot.player.id];
+              const revealed = mode === 'final' && finalPosRevealed(state, slot.posKey);
+              const draftYr = SEASON_SEQUENCE.find(s => s.pos === slot.posKey)?.yr;
+              let cls = 'pitch-slot ';
+              if (!slot.player) cls += 'empty';
+              else if (isSell) cls += 'sell';
+              else cls += 'filled';
+              if (sellable) cls += ' clickable';
+              return (
+                <div key={slot.posKey} className={cls}
+                     onClick={() => sellable && dispatch({ type: 'WINDOW_TOGGLE', playerId: slot.player.id })}>
+                  <div className="slot-circle">
+                    {slot.player ? <Silhouette className="slot-silh" /> : POS_LABEL[slot.posKey]}
+                  </div>
+                  <span className="slot-pos">{POS_LABEL[slot.posKey]}</span>
+                  {slot.player ? (
+                    mode === 'final'
+                      ? (revealed
+                          ? <><span className="slot-name">{slot.player.name}</span><span className="slot-val">{fmtM(slot.player.curVal)}</span></>
+                          : <span className="slot-val">€?M</span>)
+                      : <span className="slot-val">{isSell ? 'SELL' : fmtM(slot.player.curVal)}</span>
+                  ) : <span className="slot-year">{draftYr || '—'}</span>}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+      <div className="pitch-total">
+        <span className="lbl">{mode === 'final' ? 'Running Total' : 'Squad Value'}</span>
+        <span className="amt mono-num" style={{ color: total < 0 ? 'var(--bad)' : 'var(--acc)' }}>{fmtM(total)}</span>
+      </div>
+    </div>
+  );
+}
+
+function SquadScreen({ state, dispatch }) {
+  // Show all managers' squads? For simplicity show each manager; but TV: show one at a time via tabs.
+  const [tab, setTab] = useState(0);
+  const mgr = state.managers[tab];
+  const advance = () => dispatch({ type: 'SQUAD_DONE' });
+  useKey(' ', advance); useKey('Enter', advance);
+
+  return (
+    <div className="scene">
+      <div className="scene-head" style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end' }}>
+        <div>
+          <div className="h1">Squad — {mgr.name}</div>
+          <div className="sub">{curSeason(state).yr} · spent {fmtM(mgr.totalSpent)}</div>
+        </div>
+        <div style={{ display:'flex', gap:8 }}>
+          {state.managers.map((m, i) => (
+            <button key={m.id} className={'btn ' + (i===tab?'btn-primary':'btn-ghost')} style={{fontSize:18,padding:'10px 18px'}} onClick={() => setTab(i)}>{m.name}</button>
+          ))}
+        </div>
+      </div>
+      <PitchFormation mgr={mgr} mode="view" state={state} dispatch={dispatch} />
+      <div className="cta-row">
+        <button className="btn btn-primary btn-lg" onClick={advance}>Continue →</button>
+      </div>
+    </div>
+  );
+}
+
+function WindowDecideScreen({ state, dispatch }) {
+  const mgr = state.managers[state.windowMgr];
+  const se = curSeason(state);
+  const nSell = Object.keys(state.windowSel).length;
+  return (
+    <div className="scene">
+      <div className="scene-head">
+        <div className="h1">Window {se.window} — {mgr.name}</div>
+        <div className="sub">Tap any player to mark them for SALE. Identities stay hidden until the reveal.</div>
+      </div>
+      <PitchFormation mgr={mgr} mode="sell" state={state} dispatch={dispatch} />
+      <div className="cta-row">
+        <span style={{ marginRight: 'auto', alignSelf:'center', color:'var(--text-dim)', fontSize:20 }}>
+          {nSell === 0 ? 'Holding everyone' : `${nSell} marked to sell`}
+        </span>
+        <button className="btn btn-primary btn-lg" onClick={() => dispatch({ type: 'WINDOW_CONFIRM' })}>
+          Confirm {mgr.name}'s window →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function WindowRevealScreen({ state, dispatch }) {
+  const item = state.sold[state.revealIdx];
+  const mgr = state.managers.find(m => m.id === item.mgrId);
+  const stage = state.revealStage;
+  const p = item.player;
+  const shelf = state.shelf[item.pos] || [];
+  const hasShelf = shelf.length > 0;
+  const profit = p.sellVal - p.buyVal;
+
+  const advance = () => dispatch({ type: 'REVEAL_NEXT' });
+  // Allow advancing with click/space unless we're at shelf-pick stage waiting for choice
+  const awaitingPick = hasShelf && stage === 5 && item.replacementId == null;
+  const clickAdvance = () => { if (!awaitingPick) advance(); };
+  useKey(' ', () => { if (!awaitingPick) advance(); });
+
+  return (
+    <div className="scene scene-full" onClick={clickAdvance}>
+      <div className="reveal-stage" onClick={e => e.stopPropagation()}>
+        <div className="kicker">{mgr.name} · {p.pos==='CB2'?'CB':p.pos} · bought {SEASON_SEQUENCE.find(s=>s.pos===p.pos)?.yr}</div>
+
+        {/* identity card */}
+        <div className="rv-card">
+          {stage >= 2
+            ? <><div className="rv-name">{p.name}</div><div className="rv-club">{p.club}</div></>
+            : <Silhouette className="rv-silh" />}
+          <div className="rv-line"><span className="l">Bought</span><span className="v">{fmtM(p.buyVal)}</span></div>
+          {stage >= 1 && (
+            <div className="rv-line"><span className="l">Sold</span>
+              <Money value={p.sellVal} run={true} className="v" />
+            </div>
+          )}
+        </div>
+
+        {/* shelf */}
+        {hasShelf && stage >= 3 && (
+          <>
+            <div className="kicker" style={{marginTop:8}}>Choose a replacement from the {p.pos==='CB2'?'CB':p.pos} shelf</div>
+            <div className="shelf-row">
+              {shelf.map(sp => (
+                <div key={sp.id}
+                     className={'shelf-card' + (item.replacementId === sp.id ? ' picked' : '')}
+                     onClick={() => stage >= 5 && item.replacementId == null && dispatch({ type:'REVEAL_PICK_REPLACEMENT', playerId: sp.id })}>
+                  <PosBadge pos={sp.pos} sm />
+                  {stage >= 5
+                    ? <div className="mono-num" style={{fontSize:24,fontWeight:700}}>{sp.name}</div>
+                    : <Silhouette className="shelf-silh" />}
+                  {stage >= 4 && <div className="mono-num" style={{fontSize:30}}>{fmtM(sp.curVal)}</div>}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* profit */}
+        {stage >= 6 && (
+          <div style={{ textAlign:'center' }}>
+            <div className={'rv-profit ' + (profit >= 0 ? 'good' : 'bad')}>{profit>=0?'+':''}{fmtM(profit)}</div>
+            <div className="rv-profit-lbl">Banked</div>
+          </div>
+        )}
+
+        <div className="hint">
+          {awaitingPick ? 'Pick a replacement above' :
+           stage >= 6 ? 'Click to continue →' : 'Click to reveal next →'}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function finalPosRevealed(state, posKey) {
+  const idx = PITCH_ORDER.indexOf(posKey);
+  return idx <= state.finalIdx;
+}
+function FinalRevealScreen({ state, dispatch }) {
+  // Final reveal shown per manager via tabs; running total per manager.
+  const [tab, setTab] = useState(0);
+  const mgr = state.managers[tab];
+  const advance = () => dispatch({ type: 'FINAL_NEXT' });
+  useKey(' ', advance); useKey('Enter', advance);
+
+  // running total for this manager up to finalIdx
+  let running = -mgr.totalSpent + mgr.bankedProfit * (state.finalProfit ? 1 : 0);
+  PITCH_ORDER.forEach((posKey, idx) => {
+    if (idx <= state.finalIdx) {
+      const pid = mgr.squad[posKey];
+      if (pid) running += PLAYER_BY_ID[pid].curVal;
+    }
+  });
+  const tween = useTween(running);
+
+  const cols = pitchSlots(mgr);
+  return (
+    <div className="scene" onClick={advance}>
+      <div className="scene-head" style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end' }}>
+        <div>
+          <div className="h1">Final Reveal</div>
+          <div className="sub">Revealing back to front. Who did {mgr.name} actually buy?</div>
+        </div>
+        <div style={{ display:'flex', gap:8 }} onClick={e=>e.stopPropagation()}>
+          {state.managers.map((m, i) => (
+            <button key={m.id} className={'btn ' + (i===tab?'btn-primary':'btn-ghost')} style={{fontSize:18,padding:'10px 18px'}} onClick={() => setTab(i)}>{m.name}</button>
+          ))}
+        </div>
+      </div>
+      <div className="pitch-wrap">
+        <div className="pitch">
+          {cols.map((col, ci) => (
+            <div key={ci} className="pitch-col">
+              {col.map(slot => {
+                const revealed = finalPosRevealed(state, slot.posKey);
+                const draftYr = SEASON_SEQUENCE.find(s => s.pos === slot.posKey)?.yr;
+                return (
+                  <div key={slot.posKey} className={'pitch-slot ' + (slot.player ? (revealed?'filled':'empty') : 'empty')}>
+                    <div className="slot-circle">
+                      {slot.player && revealed ? <Silhouette className="slot-silh" /> : POS_LABEL[slot.posKey]}
+                    </div>
+                    <span className="slot-pos">{POS_LABEL[slot.posKey]}</span>
+                    {slot.player
+                      ? (revealed
+                          ? <><span className="slot-name">{slot.player.name}</span><span className="slot-val">{fmtM(slot.player.curVal)}</span></>
+                          : <span className="slot-val">€?M</span>)
+                      : <span className="slot-year">empty</span>}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+        <div className="pitch-total">
+          <span className="lbl">{mgr.name} — Net {state.finalProfit ? '(incl. banked)' : ''}</span>
+          <span className="amt mono-num" style={{ color: tween < 0 ? 'var(--bad)' : 'var(--acc)' }}>{fmtM(tween)}</span>
+        </div>
+      </div>
+      <div className="hint">
+        {state.finalIdx < PITCH_ORDER.length - 1 ? 'Click to reveal next position →'
+          : !state.finalProfit ? 'Click to add banked transfer profits →'
+          : 'Click to see final standings →'}
+      </div>
+    </div>
+  );
+}
+
+function StandingsScreen({ state, dispatch }) {
+  const ranked = [...state.managers].map(m => ({ m, score: scoreOf(m), sq: squadValue(m) }))
+                    .sort((a, b) => b.score - a.score);
+  const allRevealed = state.standRevealed >= state.managers.length;
+  const advance = () => dispatch({ type: 'STAND_NEXT' });
+  useKey(' ', () => { if (!allRevealed) advance(); });
+
+  const podiumOrder = [ranked[1], ranked[0], ranked[2]].filter(Boolean);
+  const podClass = (r) => r === ranked[0] ? 'p1' : r === ranked[1] ? 'p2' : 'p3';
+  const rankOf = (r) => ranked.indexOf(r) + 1;
+
+  return (
+    <div className="scene scene-full" onClick={() => !allRevealed && advance()}>
+      <div style={{ width:'100%', maxWidth:1200 }} onClick={e => e.stopPropagation()}>
+        {allRevealed && (
+          <div className="win-banner rise" style={{ marginBottom: 24 }}>
+            <div className="display">{ranked[0].m.name} Wins</div>
+            <div className="h2" style={{ fontSize: 36, color:'var(--text-dim)' }}>Net {fmtM(ranked[0].score)}</div>
+          </div>
+        )}
+        {allRevealed && (
+          <div className="podium-row">
+            {podiumOrder.map(r => (
+              <div key={r.m.id} className={'podium ' + podClass(r)}>
+                <div className="avatar pod-av">{r.m.name[0].toUpperCase()}</div>
+                <div className="pod-block">
+                  <div className="pod-rank">{rankOf(r)}</div>
+                  <div className="pod-name">{r.m.name}</div>
+                  <div className="pod-score">{fmtM(r.score)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <table className="standings-table">
+          <thead><tr><th>#</th><th>Manager</th><th>Squad Value</th><th>Spent</th><th>Banked</th><th>Total</th></tr></thead>
+          <tbody>
+            {ranked.map((r, i) => {
+              const show = i < state.standRevealed || allRevealed;
+              return (
+                <tr key={r.m.id} className={allRevealed && i === 0 ? 'win' : ''}>
+                  <td className="num">{i + 1}</td>
+                  <td>{r.m.name}</td>
+                  <td className="num">{fmtM(r.sq)}</td>
+                  <td className="num">−{fmtM(r.m.totalSpent)}</td>
+                  <td className="num">{fmtM(r.m.bankedProfit)}</td>
+                  <td className="num" style={{ color: show ? (r.score>=0?'var(--acc)':'var(--bad)') : 'var(--text-faint)', fontWeight:800 }}>
+                    {show ? fmtM(r.score) : '€??M'}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        <div className="cta-row" style={{ justifyContent:'center' }}>
+          {!allRevealed
+            ? <button className="btn btn-primary btn-lg" onClick={advance}>Reveal next total →</button>
+            : <button className="btn btn-ghost btn-lg" onClick={() => dispatch({ type:'PLAY_AGAIN' })}>Play again</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================================
+   KEY HOOK + APP
+   ========================================================================= */
+
+function useKey(key, fn) {
+  useEffect(() => {
+    const h = (e) => { if (e.key === key) { e.preventDefault(); fn(); } };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  });
+}
+
+function App() {
+  const [state, dispatch] = useReducer(reducer, initial);
+  const showSidebar = state.state !== 'SETUP';
+
+  let screen;
+  switch (state.state) {
+    case 'SETUP':         screen = <SetupScreen dispatch={dispatch} />; break;
+    case 'ANNOUNCE':      screen = <AnnounceScreen state={state} dispatch={dispatch} />; break;
+    case 'DRAFT':         screen = <DraftScreen state={state} dispatch={dispatch} />; break;
+    case 'SQUAD':         screen = <SquadScreen state={state} dispatch={dispatch} />; break;
+    case 'WINDOW_DECIDE': screen = <WindowDecideScreen state={state} dispatch={dispatch} />; break;
+    case 'WINDOW_REVEAL': screen = <WindowRevealScreen state={state} dispatch={dispatch} />; break;
+    case 'FINAL_REVEAL':  screen = <FinalRevealScreen state={state} dispatch={dispatch} />; break;
+    case 'STANDINGS':     screen = <StandingsScreen state={state} dispatch={dispatch} />; break;
+    default:              screen = <div className="scene">Unknown state</div>;
+  }
+
+  return (
+    <>
+      {showSidebar && <Sidebar state={state} />}
+      <main className="main">{screen}</main>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
