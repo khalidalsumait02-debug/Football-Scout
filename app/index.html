@@ -380,7 +380,14 @@ function squadValue(mgr) {
   return Object.values(mgr.squad).reduce((sum, pid) => sum + (pid ? PLAYER_BY_ID[pid].curVal : 0), 0);
 }
 function scoreOf(mgr) {
-  return squadValue(mgr) - mgr.totalSpent + mgr.bankedProfit;
+  // gain from each original pick still held + profit banked from selling original picks
+  const heldGain = Object.keys(mgr.squad).reduce((sum, pos) => {
+    const pid = mgr.squad[pos];
+    if (!pid || mgr.locked[pos]) return sum;
+    const p = PLAYER_BY_ID[pid];
+    return sum + p.curVal - p.buyVal;
+  }, 0);
+  return heldGain + mgr.bankedProfit;
 }
 // What a manager paid for the player currently in a slot: draft value for an original
 // pick, or the (current-value) fee paid for a redrafted replacement. Spoiler-free —
@@ -570,15 +577,15 @@ function applySoldMoney(state) {
         squad: { ...m.squad, [item.pos]: repl.id },
         locked: { ...m.locked, [item.pos]: true }, // a redraft can't be sold again
         totalSpent: m.totalSpent + repl.curVal,
-        bankedProfit: m.bankedProfit + (item.player.sellVal - repl.curVal),
+        bankedProfit: m.bankedProfit + (item.player.sellVal - item.player.buyVal),
       };
     }
-    // sold without replacing -> empty slot, keep full sale proceeds
+    // sold without replacing -> empty slot
     if (m.squad[item.pos] !== item.player.id) return m;
     return {
       ...m,
       squad: { ...m.squad, [item.pos]: null },
-      bankedProfit: m.bankedProfit + item.player.sellVal,
+      bankedProfit: m.bankedProfit + (item.player.sellVal - item.player.buyVal),
     };
   });
   return { ...state, managers };
@@ -1032,12 +1039,13 @@ function FinalRevealScreen({ state, dispatch }) {
   const advance = () => dispatch({ type: 'FINAL_NEXT' });
   useKey(' ', advance); useKey('Enter', advance);
 
-  // running total for this manager up to finalIdx
-  let running = -mgr.totalSpent + mgr.bankedProfit * (state.finalProfit ? 1 : 0);
+  // running total: each slot adds its gain (curVal − buyVal for originals, 0 for locked replacements)
+  let running = mgr.bankedProfit * (state.finalProfit ? 1 : 0);
   PITCH_ORDER.forEach((posKey, idx) => {
     if (idx <= state.finalIdx) {
       const pid = mgr.squad[posKey];
-      if (pid) running += PLAYER_BY_ID[pid].curVal;
+      const p = pid ? PLAYER_BY_ID[pid] : null;
+      running += p ? (mgr.locked[posKey] ? 0 : p.curVal - p.buyVal) : 0;
     }
   });
   const tween = useTween(running);
@@ -1137,7 +1145,7 @@ function StandingsScreen({ state, dispatch }) {
           </div>
         )}
         <table className="standings-table">
-          <thead><tr><th>#</th><th>Manager</th><th>Squad Value</th><th>Transfer Profit</th><th>Total</th></tr></thead>
+          <thead><tr><th>#</th><th>Manager</th><th>Squad Value</th><th>Sales Profit</th><th>Total</th></tr></thead>
           <tbody>
             {ranked.map((r, i) => {
               const show = i < state.standRevealed || allRevealed;
