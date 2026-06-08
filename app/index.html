@@ -404,6 +404,17 @@ function squadValue(mgr) {
 function scoreOf(mgr) {
   return squadValue(mgr) - mgr.totalSpent + mgr.bankedProfit;
 }
+// What a manager paid for the player currently in a slot: draft value for an original
+// pick, or the (current-value) fee paid for a redrafted replacement. Spoiler-free —
+// these are the figures the manager already saw when acquiring the player.
+function paidFor(mgr, posKey) {
+  const pid = mgr.squad[posKey];
+  if (!pid) return 0;
+  return mgr.locked[posKey] ? PLAYER_BY_ID[pid].curVal : PLAYER_BY_ID[pid].buyVal;
+}
+function squadPaid(mgr) {
+  return Object.keys(mgr.squad).reduce((sum, pos) => sum + paidFor(mgr, pos), 0);
+}
 
 /* =========================================================================
    REDUCER
@@ -825,7 +836,7 @@ function pitchSlots(mgr, opts = {}) {
 function PitchFormation({ mgr, mode, state, dispatch }) {
   // mode: 'view' | 'sell'
   const cols = pitchSlots(mgr);
-  const total = useTween(squadValue(mgr));
+  const total = useTween(squadPaid(mgr));
 
   return (
     <div className="pitch-wrap">
@@ -858,7 +869,7 @@ function PitchFormation({ mgr, mode, state, dispatch }) {
                       ? (revealed
                           ? <><span className="slot-name">{slot.player.name}</span><span className="slot-val">{fmtM(slot.player.curVal)}</span></>
                           : <span className="slot-val">€?M</span>)
-                      : <span className="slot-val">{isSell ? 'SELL' : fmtM(slot.player.curVal)}</span>
+                      : <span className="slot-val">{isSell ? 'SELL' : fmtM(paidFor(mgr, slot.posKey))}</span>
                   ) : <span className="slot-year">{draftYr || '—'}</span>}
                 </div>
               );
@@ -867,7 +878,7 @@ function PitchFormation({ mgr, mode, state, dispatch }) {
         ))}
       </div>
       <div className="pitch-total">
-        <span className="lbl">{mode === 'final' ? 'Running Total' : 'Squad Value'}</span>
+        <span className="lbl">Total Spent</span>
         <span className="amt mono-num" style={{ color: total < 0 ? 'var(--bad)' : 'var(--acc)' }}>{fmtM(total)}</span>
       </div>
     </div>
@@ -886,7 +897,7 @@ function SquadScreen({ state, dispatch }) {
       <div className="scene-head" style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end' }}>
         <div>
           <div className="h1">Squad — {mgr.name}</div>
-          <div className="sub">{curSeason(state).yr} · spent {fmtM(mgr.totalSpent)}</div>
+          <div className="sub">{curSeason(state).yr} · paid for this squad</div>
         </div>
         <div style={{ display:'flex', gap:8 }}>
           {state.managers.map((m, i) => (
