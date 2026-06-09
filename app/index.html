@@ -326,6 +326,34 @@ function shuffle(arr) {
   return a;
 }
 
+// Draft weighting — surface popular/better players more often than obscure ones.
+// `prominence` blends fame (the value shown on the draft card) with quality (the best
+// value the player ever reaches). `draftWeight` lightly compresses it so stars are
+// clearly favored but underdogs still appear for variety. All three constants below
+// are single-line tunables: raise the exponent / lower the floor for a stronger skew.
+function prominence(p) {
+  const peak = Math.max(p.buyVal || 0, p.sellVal || 0, p.curVal || 0);
+  return 0.6 * (p.buyVal || 0) + 0.4 * peak;        // fame-leaning blend
+}
+function draftWeight(p) {
+  return Math.pow(prominence(p), 0.6) + 4;          // 0.6 exp softens; +4 floor keeps variety
+}
+
+// Weighted sampling WITHOUT replacement: pick n distinct cards, each draw proportional
+// to draftWeight. Removes the chosen card so it can't be drawn twice.
+function weightedSample(pool, n, weightFn) {
+  const items = [...pool];
+  const out = [];
+  while (out.length < n && items.length) {
+    const total = items.reduce((s, p) => s + weightFn(p), 0);
+    let r = Math.random() * total;
+    let idx = items.length - 1;
+    for (let i = 0; i < items.length; i++) { r -= weightFn(items[i]); if (r <= 0) { idx = i; break; } }
+    out.push(items.splice(idx, 1)[0]);
+  }
+  return out;
+}
+
 function fmtM(v) {
   if (v == null) return '€?M';
   const neg = v < 0; const a = Math.abs(v);
@@ -445,7 +473,7 @@ function reducer(state, action) {
       // Draw the board for this draft: max(5, 2×managers) random cards from the deep pool.
       const pool = DRAFT_POOLS[se.pos];
       const n = Math.min(pool.length, Math.max(5, 2 * state.managers.length));
-      const board = shuffle(pool).slice(0, n);
+      const board = weightedSample(pool, n, draftWeight);
       return { ...state, state: 'DRAFT', draftIdx: 0, picking: null, outIdx: null, board };
     }
 
