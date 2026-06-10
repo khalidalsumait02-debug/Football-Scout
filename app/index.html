@@ -96,7 +96,7 @@ input { font-family: inherit; }
 .scene-shell { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .scene-shell.out { pointer-events: none; }
 .scene-shell.out .scene { animation: scene-out .26s ease both; }
-.scene { flex: 1; display: flex; flex-direction: column; padding: 40px 48px; animation: scene-in .4s ease both; min-height: 0; }
+.scene { flex: 1; display: flex; flex-direction: column; padding: 40px 48px; animation: scene-in .4s ease both; min-height: 0; position: relative; z-index: 1; }
 .scene-full { padding: 0; align-items: center; justify-content: center; }
 
 .scene-head { margin-bottom: 24px; }
@@ -156,9 +156,18 @@ input { font-family: inherit; }
 .add-mgr:disabled { opacity: .35; }
 
 /* ---------- Announce ---------- */
-.announce { text-align: center; max-width: 1100px; }
+.announce { text-align: center; max-width: 1100px; position: relative; z-index: 1; }
 .announce .season-no { color: var(--teal); font-family: var(--font-d); font-weight: 600; letter-spacing: 4px; font-size: 26px; text-transform: uppercase; }
-.announce .big-year { font-family: var(--font-d); font-weight: 800; font-size: 200px; color: var(--acc); line-height: 0.9; margin: 8px 0; }
+.announce .big-year { font-family: var(--font-d); font-weight: 800; font-size: 200px; color: var(--acc); line-height: 0.9; margin: 8px 0; animation: year-slam .55s cubic-bezier(.2,1.3,.4,1) both, year-glow .8s ease .45s both; }
+/* ambient announce background */
+.announce-bg { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.bg-blob { position: absolute; width: 900px; height: 900px; border-radius: 50%; filter: blur(90px); }
+.bg-blob.a { background: radial-gradient(circle, rgba(200,255,0,.07), transparent 65%); top: -220px; left: -160px; animation: bg-drift 18s ease-in-out infinite alternate; }
+.bg-blob.b { background: radial-gradient(circle, rgba(0,212,180,.07), transparent 65%); bottom: -260px; right: -160px; animation: bg-drift 26s ease-in-out infinite alternate-reverse; }
+.bg-pitch { position: absolute; left: 50%; top: 50%; width: 900px; height: 900px; margin: -450px 0 0 -450px; border: 2px solid rgba(255,255,255,.04); border-radius: 50%; animation: slow-spin 60s linear infinite; }
+.bg-pitch::before { content: ''; position: absolute; left: -300px; right: -300px; top: 50%; border-top: 2px solid rgba(255,255,255,.04); }
+.slam { display: inline-block; position: relative; animation: badge-slam .5s cubic-bezier(.3,1.2,.4,1) .35s both; }
+.slam::after { content: ''; position: absolute; inset: -8px; border-radius: 18px; animation: shockwave .7s ease-out .85s 1 both; }
 .announce .tagline { font-size: 30px; color: var(--text); margin-top: 18px; }
 .announce .stat-preview { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 30px; }
 .announce .sp-pill { background: var(--surface); border: 1px solid var(--line2); border-radius: 999px; padding: 12px 24px; font-family: var(--font-d); font-weight: 600; font-size: 22px; color: var(--teal); }
@@ -272,6 +281,12 @@ input { font-family: inherit; }
 @keyframes rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
 @keyframes drafted-out { to { opacity: 0; transform: translateX(70px) rotate(5deg); flex-grow: 0.01; padding-left: 0; padding-right: 0; } }
 @keyframes deal-in { from { opacity: 0; transform: translateY(46px) rotate(-2deg) scale(.93); } }
+@keyframes bg-drift { from { transform: translate(0, 0) scale(1); } to { transform: translate(120px, 60px) scale(1.15); } }
+@keyframes slow-spin { to { transform: rotate(360deg); } }
+@keyframes year-slam { 0% { transform: scale(1.6); opacity: 0; filter: blur(6px); } 100% { transform: scale(1); opacity: 1; filter: blur(0); } }
+@keyframes year-glow { to { text-shadow: 0 0 70px var(--acc-glow); } }
+@keyframes badge-slam { 0% { transform: scale(2.6) rotate(-4deg); opacity: 0; } 60% { transform: scale(.92) rotate(0deg); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes shockwave { from { box-shadow: 0 0 0 0 var(--acc-glow); opacity: 1; } to { box-shadow: 0 0 0 44px rgba(200,255,0,0); opacity: 0; } }
 @keyframes id-flip { from { transform: rotateY(90deg); opacity: 0; } to { transform: rotateY(0); opacity: 1; } }
 @keyframes pop-in { 0% { transform: scale(.5); opacity: 0; } 70% { transform: scale(1.12); } 100% { transform: scale(1); opacity: 1; } }
 @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 var(--acc-glow); } 70% { box-shadow: 0 0 0 12px rgba(200,255,0,0); } 100% { box-shadow: 0 0 0 0 rgba(200,255,0,0); } }
@@ -768,21 +783,26 @@ function AnnounceScreen({ state, dispatch }) {
   const statKeys = !isWindow ? STAT_KEYS[se.pos] : null;
   return (
     <div className="scene scene-full" onClick={advance}>
+      <div className="announce-bg">
+        <div className="bg-blob a" />
+        <div className="bg-blob b" />
+        <div className="bg-pitch" />
+      </div>
       <div className="announce">
         <div className="season-no rise">Season {se.step + 1} · {se.yr}</div>
         <div className="big-year">{Math.round(yearNum)}/{(Math.round(yearNum)+1).toString().slice(2)}</div>
-        <div className="rise" style={{ animationDelay: '.1s' }}>
+        <div className="slam">
           {isWindow
             ? <PosBadge pos="⇄" size="lg" />
             : <span className="pos-badge lg">{POS_LABEL[se.pos]}</span>}
         </div>
-        <div className="tagline rise" style={{ animationDelay: '.2s' }}>
+        <div className="tagline rise" style={{ animationDelay: '.55s' }}>
           {isWindow ? `Transfer Window ${se.window} — hold or cash out` : `Time to scout a ${se.label}`}
         </div>
         {!isWindow && (
           <div className="stat-preview">
             {statKeys.map((k, i) => (
-              <div key={k} className="sp-pill rise" style={{ animationDelay: (0.3 + i*0.08) + 's' }}>{k}</div>
+              <div key={k} className="sp-pill rise" style={{ animationDelay: (0.65 + i*0.08) + 's' }}>{k}</div>
             ))}
           </div>
         )}
