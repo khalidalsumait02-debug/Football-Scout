@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=1920" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>The Scout</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -37,12 +37,18 @@
 
 html, body {
   width: 100vw; height: 100vh; overflow: hidden;
-  background: var(--bg); color: var(--text);
+  background: #000; color: var(--text);
   font-family: var(--font-u); font-size: 18px;
   -webkit-font-smoothing: antialiased;
 }
 
-#root { width: 100vw; height: 100vh; display: flex; }
+/* Fixed 1920×1080 stage, scaled by App to fit the window (letterboxed) */
+#root {
+  width: 1920px; height: 1080px; display: flex;
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--bg); overflow: hidden;
+}
 
 button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
 input { font-family: inherit; }
@@ -1222,9 +1228,23 @@ function useKey(key, fn) {
   }, [key]);
 }
 
+// Scale the fixed 1920×1080 stage to fit the window (letterboxed on non-16:9)
+function useStageScale() {
+  useEffect(() => {
+    const fit = () => {
+      const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+      document.getElementById('root').style.transform = `translate(-50%, -50%) scale(${s})`;
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, []);
+}
+
 function App() {
   const [state, dispatch] = useReducer(reducer, initial);
   const showSidebar = state.state !== 'SETUP';
+  useStageScale();
 
   let screen;
   switch (state.state) {
