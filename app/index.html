@@ -166,7 +166,14 @@ input { font-family: inherit; }
 
 /* ---------- Draft ---------- */
 .draft-cards { display: grid; gap: 16px; flex: 1; min-height: 0; grid-auto-rows: 1fr; }
-.draft-card { background: var(--surface); border-radius: var(--r); border: 2px solid var(--line2); display: flex; flex-direction: column; padding: 22px 20px; cursor: pointer; transition: transform .15s, box-shadow .15s, border-color .15s; position: relative; overflow: hidden; }
+.draft-card { background: var(--surface); border-radius: var(--r); border: 2px solid var(--line2); display: flex; flex-direction: column; padding: 22px 20px; cursor: pointer; transition: transform .15s, box-shadow .15s, border-color .15s; position: relative; overflow: hidden; animation: deal-in .45s cubic-bezier(.2,.9,.3,1.15) both; animation-delay: calc(min(var(--i, 0), 9) * 65ms); }
+/* value tiers */
+.draft-card.tier-gold   { border-color: rgba(255,215,94,.55); box-shadow: inset 0 0 24px rgba(255,215,94,.10), 0 0 18px rgba(255,215,94,.08); }
+.draft-card.tier-silver { border-color: rgba(174,191,214,.45); }
+.draft-card.tier-bronze { border-color: rgba(168,112,69,.5); }
+.draft-card.tier-gold .dc-val   { color: #ffd75e; }
+.draft-card.tier-silver .dc-val { color: #dbe6f5; }
+.draft-card.tier-bronze .dc-val { color: #e0a878; }
 /* compact mode for >6 cards (wraps into two rows) */
 .draft-cards.compact { gap: 10px; }
 .draft-cards.compact .draft-card { padding: 12px 14px; border-width: 1px; border-radius: 12px; }
@@ -179,9 +186,9 @@ input { font-family: inherit; }
 .draft-cards.compact .stat-val { font-size: 21px; }
 .draft-cards.compact .stat-val.text { font-size: 14px; }
 .draft-cards.compact .stat-lbl { font-size: 12px; }
-.draft-card:hover:not(.drafted) { transform: translateY(-10px); box-shadow: 0 24px 60px rgba(0,0,0,0.5); border-color: var(--acc); }
+.draft-card:hover:not(.drafted) { transform: translateY(-10px) perspective(1000px) rotateX(2.5deg); box-shadow: 0 24px 60px rgba(0,0,0,0.5); border-color: var(--acc); }
 .draft-card.drafted { opacity: .3; pointer-events: none; filter: grayscale(.7); }
-.draft-card.out { animation: drafted-out .55s cubic-bezier(.5,0,.75,0) both; }
+.draft-card.out { animation: drafted-out .55s cubic-bezier(.4,0,.7,.2) both; }
 .dc-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .dc-num { width: 30px; height: 30px; border-radius: 8px; background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-family: var(--font-d); font-weight: 700; font-size: 18px; color: var(--text-dim); }
 .dc-val { font-family: var(--font-d); font-weight: 800; font-size: 50px; text-align: center; margin: 2px 0 12px; }
@@ -264,6 +271,7 @@ input { font-family: inherit; }
 @keyframes scene-out { to { opacity: 0; transform: translateY(-16px) scale(.985); } }
 @keyframes rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
 @keyframes drafted-out { to { opacity: 0; transform: translateX(70px) rotate(5deg); flex-grow: 0.01; padding-left: 0; padding-right: 0; } }
+@keyframes deal-in { from { opacity: 0; transform: translateY(46px) rotate(-2deg) scale(.93); } }
 @keyframes id-flip { from { transform: rotateY(90deg); opacity: 0; } to { transform: rotateY(0); opacity: 1; } }
 @keyframes pop-in { 0% { transform: scale(.5); opacity: 0; } 70% { transform: scale(1.12); } 100% { transform: scale(1); opacity: 1; } }
 @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 var(--acc-glow); } 70% { box-shadow: 0 0 0 12px rgba(200,255,0,0); } 100% { box-shadow: 0 0 0 0 rgba(200,255,0,0); } }
@@ -638,6 +646,9 @@ function applySoldMoney(state) {
    SHARED COMPONENTS
    ========================================================================= */
 
+// Card value tiers (thresholds from the inlined pools: p85 ≈ €60M, median ≈ €35M)
+function tierOf(v) { return v >= 60 ? 'tier-gold' : v >= 25 ? 'tier-silver' : 'tier-bronze'; }
+
 function PosBadge({ pos, size }) {
   return <span className={'pos-badge' + (size ? ' ' + size : '')}>{POS_LABEL[pos] || pos}</span>;
 }
@@ -824,7 +835,8 @@ function DraftScreen({ state, dispatch }) {
           const out = state.outIdx === i;
           return (
             <div key={p.id}
-                 className={'draft-card' + (drafted ? ' drafted' : '') + (out ? ' out' : '')}
+                 className={'draft-card ' + tierOf(p.buyVal) + (drafted ? ' drafted' : '') + (out ? ' out' : '')}
+                 style={{ '--i': i }}
                  onClick={() => intent(i)}>
               <div className="dc-top">
                 <PosBadge pos={pos} />
@@ -1052,7 +1064,7 @@ function ReplacePickScreen({ state, dispatch }) {
       </div>
       <div className={'draft-cards' + (compact ? ' compact' : '')} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
         {shelf.map((p, i) => (
-          <div key={p.id} className="draft-card" onClick={() => setPicking(i)}>
+          <div key={p.id} className={'draft-card ' + tierOf(p.buyVal)} style={{ '--i': i }} onClick={() => setPicking(i)}>
             <div className="dc-top"><PosBadge pos={pos} /><div className="dc-num">{i + 1}</div></div>
             <div className="dc-val">{fmtM(p.buyVal)}</div>
             <Silhouette className="dc-silh" />
