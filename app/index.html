@@ -93,7 +93,10 @@ input { font-family: inherit; }
 
 /* ---------- Main ---------- */
 .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
-.scene { flex: 1; display: flex; flex-direction: column; padding: 40px 48px; animation: scene-in .35s ease both; min-height: 0; }
+.scene-shell { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.scene-shell.out { pointer-events: none; }
+.scene-shell.out .scene { animation: scene-out .26s ease both; }
+.scene { flex: 1; display: flex; flex-direction: column; padding: 40px 48px; animation: scene-in .4s ease both; min-height: 0; }
 .scene-full { padding: 0; align-items: center; justify-content: center; }
 
 .scene-head { margin-bottom: 24px; }
@@ -257,7 +260,8 @@ input { font-family: inherit; }
 .hint { color: var(--text-faint); font-size: 16px; margin-top: 10px; text-align: center; }
 
 /* ---------- Animations ---------- */
-@keyframes scene-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes scene-in { from { opacity: 0; transform: translateY(14px) scale(.99); } to { opacity: 1; transform: none; } }
+@keyframes scene-out { to { opacity: 0; transform: translateY(-16px) scale(.985); } }
 @keyframes rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
 @keyframes drafted-out { to { opacity: 0; transform: translateX(70px) rotate(5deg); flex-grow: 0.01; padding-left: 0; padding-right: 0; } }
 @keyframes id-flip { from { transform: rotateY(90deg); opacity: 0; } to { transform: rotateY(0); opacity: 1; } }
@@ -1241,8 +1245,32 @@ function useStageScale() {
   }, []);
 }
 
+// Deferred-swap scene transition: on key change, play the exit animation on the
+// frozen old scene, then mount the new one (which plays scene-in). gateRef blocks
+// dispatch during the out-phase so Space-mashing can't double-advance.
+function SceneShell({ sceneKey, gateRef, children }) {
+  const [shown, setShown] = useState(sceneKey);
+  const [out, setOut] = useState(false);
+  const last = useRef(children);
+  if (sceneKey === shown && !out) last.current = children;
+  useEffect(() => {
+    if (sceneKey === shown) { setOut(false); gateRef.current = false; return; }
+    setOut(true);
+    gateRef.current = true;
+    const t = setTimeout(() => { setShown(sceneKey); setOut(false); gateRef.current = false; }, 260);
+    return () => clearTimeout(t);
+  }, [sceneKey, shown]);
+  return (
+    <div className={'scene-shell' + (out ? ' out' : '')}>
+      {sceneKey === shown ? children : last.current}
+    </div>
+  );
+}
+
 function App() {
-  const [state, dispatch] = useReducer(reducer, initial);
+  const [state, rawDispatch] = useReducer(reducer, initial);
+  const gateRef = useRef(false);
+  const dispatch = useCallback((a) => { if (!gateRef.current) rawDispatch(a); }, []);
   const showSidebar = state.state !== 'SETUP';
   useStageScale();
 
@@ -1263,7 +1291,9 @@ function App() {
   return (
     <>
       {showSidebar && <Sidebar state={state} />}
-      <main className="main">{screen}</main>
+      <main className="main">
+        <SceneShell sceneKey={state.state} gateRef={gateRef}>{screen}</SceneShell>
+      </main>
     </>
   );
 }
