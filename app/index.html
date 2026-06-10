@@ -93,6 +93,12 @@ input { font-family: inherit; }
 
 /* ---------- Main ---------- */
 .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+.main::before { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.45)),
+    radial-gradient(900px 600px at 15% -10%, rgba(200,255,0,.04), transparent 70%),
+    radial-gradient(900px 600px at 90% 110%, rgba(0,212,180,.04), transparent 70%);
+}
 .scene-shell { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .scene-shell.out { pointer-events: none; }
 .scene-shell.out .scene { animation: scene-out .26s ease both; }
@@ -106,8 +112,11 @@ input { font-family: inherit; }
 /* ---------- Buttons ---------- */
 .btn { font-family: var(--font-d); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border-radius: 12px; padding: 16px 32px; font-size: 24px; transition: transform .12s, box-shadow .2s, background .2s; }
 .btn:active { transform: scale(.97); }
-.btn-primary { background: var(--acc); color: #0d1117; }
-.btn-primary:hover { box-shadow: 0 8px 30px var(--acc-glow); }
+.btn-primary { background: var(--acc); color: #0d1117; position: relative; overflow: hidden; }
+.btn-primary::after { content: ''; position: absolute; top: 0; bottom: 0; left: -75%; width: 50%; background: linear-gradient(105deg, transparent, rgba(255,255,255,.35), transparent); transform: skewX(-20deg); transition: left .6s ease; pointer-events: none; }
+.btn-primary:hover { box-shadow: 0 8px 30px var(--acc-glow); transform: translateY(-2px); }
+.btn-primary:hover::after { left: 125%; }
+.btn-primary:active { transform: scale(.97); }
 .btn-ghost { background: rgba(255,255,255,0.06); color: var(--text); border: 1px solid var(--line2); }
 .btn-ghost:hover { background: rgba(255,255,255,0.12); }
 .btn-good { background: transparent; color: var(--good); border: 2px solid var(--good); }
@@ -294,6 +303,21 @@ input { font-family: inherit; }
 
 .hint { color: var(--text-faint); font-size: 16px; margin-top: 10px; text-align: center; }
 
+/* ---------- Advance hint + turn chip ---------- */
+.advance-chip-row { display: flex; justify-content: center; margin-top: 16px; }
+.advance-chip { display: inline-flex; align-items: center; gap: 10px; color: var(--text-dim); font-size: 17px; background: rgba(255,255,255,.04); border: 1px solid var(--line); border-radius: 999px; padding: 8px 20px; animation: chip-pulse 1.8s ease-in-out infinite; }
+.keycap { font-family: var(--font-d); font-weight: 700; font-size: 15px; letter-spacing: 1px; text-transform: uppercase; border: 1px solid var(--line2); border-bottom-width: 3px; border-radius: 6px; padding: 1px 10px; color: var(--text); background: rgba(255,255,255,.06); }
+.turn-chip { display: inline-flex; align-items: center; gap: 12px; background: var(--acc-glow); border: 1px solid var(--acc); border-radius: 999px; padding: 8px 24px 8px 8px; animation: pop-in .4s ease both; }
+.turn-chip .avatar { background: var(--acc); color: #0d1117; animation: pulse-ring 1.6s infinite; }
+.turn-chip .tc-name { font-family: var(--font-d); font-weight: 700; font-size: 26px; line-height: 1; }
+.turn-chip .tc-lbl { font-size: 13px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); }
+
+/* ---------- Focus + reduced motion ---------- */
+.btn:focus-visible, input:focus-visible, .draft-card:focus-visible, .shelf-card:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
 /* ---------- Animations ---------- */
 @keyframes scene-in { from { opacity: 0; transform: translateY(14px) scale(.99); } to { opacity: 1; transform: none; } }
 @keyframes scene-out { to { opacity: 0; transform: translateY(-16px) scale(.985); } }
@@ -314,6 +338,7 @@ input { font-family: inherit; }
 @keyframes shake { 0%, 100% { transform: none; } 20% { transform: translateX(-9px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(3px); } }
 @keyframes podium-rise { from { transform: scaleY(0); opacity: 0; } }
 @keyframes drum-blink { 50% { opacity: .25; } }
+@keyframes chip-pulse { 50% { opacity: .55; transform: translateY(2px); } }
 </style>
 </head>
 <body>
@@ -709,6 +734,28 @@ function Money({ value, run, ms, className }) {
   return <span className={'mono-num ' + (className || '')}>{fmtM(v)}</span>;
 }
 
+function AdvanceHint({ children }) {
+  return (
+    <div className="advance-chip-row">
+      <span className="advance-chip"><span className="keycap">Space</span> or click — {children}</span>
+    </div>
+  );
+}
+
+// Big "whose turn" chip — the sidebar highlight alone is too peripheral on a TV.
+// Keyed by mgr.id so it pops on every handover.
+function TurnChip({ mgr }) {
+  return (
+    <div className="turn-chip">
+      <div className="avatar">{mgr.name.charAt(0).toUpperCase()}</div>
+      <div>
+        <div className="tc-name">{mgr.name}</div>
+        <div className="tc-lbl">On the clock</div>
+      </div>
+    </div>
+  );
+}
+
 /* =========================================================================
    SIDEBAR
    ========================================================================= */
@@ -830,7 +877,7 @@ function AnnounceScreen({ state, dispatch }) {
             ))}
           </div>
         )}
-        <div className="hint">Click anywhere or press Space →</div>
+        <AdvanceHint>continue</AdvanceHint>
       </div>
     </div>
   );
@@ -869,9 +916,12 @@ function DraftScreen({ state, dispatch }) {
 
   return (
     <div className="scene">
-      <div className="scene-head">
-        <div className="h1">The Board</div>
-        <div className="sub"><span style={{color:'var(--acc)',fontWeight:700}}>{mgr.name}</span> — pick your {se.label}. Stats only, no names.</div>
+      <div className="scene-head" style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <div>
+          <div className="h1">The Board</div>
+          <div className="sub">Pick your {se.label}. Stats only, no names.</div>
+        </div>
+        <TurnChip key={mgr.id} mgr={mgr} />
       </div>
       <div className={'draft-cards' + (compact ? ' compact' : '')} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
         {pool.map((p, i) => {
@@ -987,7 +1037,7 @@ function SquadScreen({ state, dispatch }) {
   useKey(' ', advance); useKey('Enter', advance);
 
   return (
-    <div className="scene">
+    <div className="scene" onClick={advance}>
       <div className="scene-head" style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end' }}>
         <div>
           <div className="h1">Squad — {mgr.name}</div>
@@ -995,9 +1045,9 @@ function SquadScreen({ state, dispatch }) {
         </div>
         <div className="sub" style={{ alignSelf:'center' }}>Team {idx + 1} of {state.managers.length}</div>
       </div>
-      <PitchFormation mgr={mgr} mode="view" state={state} dispatch={dispatch} />
+      <PitchFormation key={mgr.id} mgr={mgr} mode="view" state={state} dispatch={dispatch} />
       <div className="cta-row">
-        <button className="btn btn-primary btn-lg" onClick={advance}>
+        <button className="btn btn-primary btn-lg" onClick={e => { e.stopPropagation(); advance(); }}>
           {last ? 'Continue →' : `Next: ${state.managers[idx + 1].name} →`}
         </button>
       </div>
@@ -1011,9 +1061,12 @@ function WindowDecideScreen({ state, dispatch }) {
   const nSell = Object.keys(state.windowSel).length;
   return (
     <div className="scene">
-      <div className="scene-head">
-        <div className="h1">Window {se.window} — {mgr.name}</div>
-        <div className="sub">Sell any of your original picks — replacements signed in a past window (🔒) can't be sold. Tap players to mark them for SALE.</div>
+      <div className="scene-head" style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <div>
+          <div className="h1">Window {se.window}</div>
+          <div className="sub">Sell any of your original picks — replacements signed in a past window (🔒) can't be sold. Tap players to mark them for SALE.</div>
+        </div>
+        <TurnChip key={mgr.id} mgr={mgr} />
       </div>
       <PitchFormation mgr={mgr} mode="sell" state={state} dispatch={dispatch} />
       <div className="cta-row">
@@ -1081,10 +1134,10 @@ function WindowRevealScreen({ state, dispatch }) {
           </div>
         )}
 
-        <div className="hint">
-          {stage < maxStage ? 'Click to reveal next →'
-            : lastSold ? 'Click to view squad →' : 'Click for the next sale →'}
-        </div>
+        <AdvanceHint>
+          {stage < maxStage ? 'reveal next'
+            : lastSold ? 'view squads' : 'next sale'}
+        </AdvanceHint>
       </div>
     </div>
   );
@@ -1205,12 +1258,12 @@ function FinalRevealScreen({ state, dispatch }) {
           <span className="amt mono-num" style={{ color: tween < 0 ? 'var(--bad)' : 'var(--acc)' }}>{fmtM(tween)}</span>
         </div>
       </div>
-      <div className="hint">
-        {state.finalIdx < PITCH_ORDER.length - 1 ? 'Click to reveal next position →'
-          : !state.finalProfit ? 'Click to reveal each player’s profit / loss →'
-          : state.finalMgr < state.managers.length - 1 ? `Click to reveal ${state.managers[state.finalMgr + 1].name}’s squad →`
-          : 'Click to see final standings →'}
-      </div>
+      <AdvanceHint>
+        {state.finalIdx < PITCH_ORDER.length - 1 ? 'reveal next position'
+          : !state.finalProfit ? 'reveal each player’s profit / loss'
+          : state.finalMgr < state.managers.length - 1 ? `reveal ${state.managers[state.finalMgr + 1].name}’s squad`
+          : 'see final standings'}
+      </AdvanceHint>
     </div>
   );
 }
