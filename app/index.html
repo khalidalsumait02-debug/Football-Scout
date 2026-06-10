@@ -241,7 +241,17 @@ input { font-family: inherit; }
 
 /* ---------- Window reveal ---------- */
 .reveal-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; text-align: center; }
-.rv-card { background: var(--surface); border: 2px solid var(--line2); border-radius: 20px; padding: 40px 60px; min-width: 480px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.reveal-stage.shake { animation: shake .45s ease both; }
+.rv-card { background: var(--surface); border: 2px solid var(--line2); border-radius: 20px; padding: 40px 60px; min-width: 480px; display: flex; flex-direction: column; align-items: center; gap: 14px; transition: border-color .4s, box-shadow .4s; }
+.rv-card.revealed { border-color: var(--acc); box-shadow: 0 0 40px var(--acc-glow); }
+.rv-line.pop, .rv-card.pop { animation: pop-in .5s ease both; }
+.flash { position: absolute; inset: 0; pointer-events: none; z-index: 9; animation: flash-out .6s ease-out both; }
+.flash.good { background: radial-gradient(circle, rgba(34,197,94,.28), transparent 70%); }
+.flash.bad  { background: radial-gradient(circle, rgba(239,68,68,.30), transparent 70%); }
+.rv-profit-wrap { position: relative; text-align: center; }
+.rv-profit-wrap::before { content: ''; position: absolute; inset: -40px -90px; z-index: -1; border-radius: 50%; filter: blur(12px); animation: pop-in .5s ease both; }
+.rv-profit-wrap.good::before { background: radial-gradient(ellipse, rgba(34,197,94,.22), transparent 70%); }
+.rv-profit-wrap.bad::before  { background: radial-gradient(ellipse, rgba(239,68,68,.22), transparent 70%); }
 .rv-silh { width: 140px; height: 140px; }
 .rv-name { font-family: var(--font-d); font-weight: 800; font-size: 56px; text-transform: uppercase; animation: id-flip .5s ease both; }
 .rv-club { color: var(--text-dim); font-size: 22px; }
@@ -294,6 +304,8 @@ input { font-family: inherit; }
 @keyframes pop-in { 0% { transform: scale(.5); opacity: 0; } 70% { transform: scale(1.12); } 100% { transform: scale(1); opacity: 1; } }
 @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 var(--acc-glow); } 70% { box-shadow: 0 0 0 12px rgba(200,255,0,0); } 100% { box-shadow: 0 0 0 0 rgba(200,255,0,0); } }
 @keyframes slot-pop { 0% { transform: scale(.3); } 70% { transform: scale(1.18); box-shadow: 0 0 0 14px var(--acc-glow); } 100% { transform: scale(1); } }
+@keyframes flash-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes shake { 0%, 100% { transform: none; } 20% { transform: translateX(-9px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(3px); } }
 </style>
 </head>
 <body>
@@ -1024,17 +1036,18 @@ function WindowRevealScreen({ state, dispatch }) {
 
   return (
     <div className="scene scene-full" onClick={advance}>
-      <div className="reveal-stage">
+      {stage >= 3 && <div key={state.revealIdx} className={'flash ' + (profit >= 0 ? 'good' : 'bad')} />}
+      <div className={'reveal-stage' + (stage === 3 && profit < 0 ? ' shake' : '')}>
         <div className="kicker">{mgr.name} · {posLbl} · bought {SEASON_SEQUENCE.find(s=>s.pos===p.pos)?.yr}</div>
 
         {/* SOLD player identity card */}
-        <div className="rv-card">
+        <div className={'rv-card' + (stage >= 2 ? ' revealed' : '')}>
           {stage >= 2
             ? <><div className="rv-name">{p.name}</div><div className="rv-club">{p.club}</div></>
             : <Silhouette className="rv-silh" />}
           <div className="rv-line"><span className="l">Bought</span><span className="v">{fmtM(p.buyVal)}</span></div>
           {stage >= 1 && (
-            <div className="rv-line"><span className="l">Sold</span>
+            <div className="rv-line pop"><span className="l">Sold</span>
               <Money value={p.sellVal} run={true} className="v" />
             </div>
           )}
@@ -1042,7 +1055,7 @@ function WindowRevealScreen({ state, dispatch }) {
 
         {/* sale profit / loss */}
         {stage >= 3 && (
-          <div style={{ textAlign:'center' }}>
+          <div className={'rv-profit-wrap ' + (profit >= 0 ? 'good' : 'bad')}>
             <div className={'rv-profit ' + (profit >= 0 ? 'good' : 'bad')}>{profit>=0?'+':''}{fmtM(profit)}</div>
             <div className="rv-profit-lbl">{profit >= 0 ? 'Profit' : 'Loss'} on sale</div>
           </div>
@@ -1050,7 +1063,7 @@ function WindowRevealScreen({ state, dispatch }) {
 
         {/* replacement old → new market value (identity stays hidden) */}
         {repl && stage >= 4 && (
-          <div className="rv-card" style={{ minWidth: 480 }}>
+          <div className="rv-card pop" style={{ minWidth: 480 }}>
             <div className="kicker">Your replacement {posLbl}</div>
             <Silhouette className="rv-silh" style={{ width: 96, height: 96 }} />
             <div className="rv-line"><span className="l">Was</span><span className="v" style={{ color:'var(--text-dim)' }}>{fmtM(repl.buyVal)}</span></div>
