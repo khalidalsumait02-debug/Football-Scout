@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=1920" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>The Scout</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -37,12 +37,18 @@
 
 html, body {
   width: 100vw; height: 100vh; overflow: hidden;
-  background: var(--bg); color: var(--text);
+  background: #000; color: var(--text);
   font-family: var(--font-u); font-size: 18px;
   -webkit-font-smoothing: antialiased;
 }
 
-#root { width: 100vw; height: 100vh; display: flex; }
+/* Fixed 1920×1080 stage, scaled by App to fit the window (letterboxed) */
+#root {
+  width: 1920px; height: 1080px; display: flex;
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--bg); overflow: hidden;
+}
 
 button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
 input { font-family: inherit; }
@@ -87,7 +93,16 @@ input { font-family: inherit; }
 
 /* ---------- Main ---------- */
 .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
-.scene { flex: 1; display: flex; flex-direction: column; padding: 40px 48px; animation: scene-in .35s ease both; min-height: 0; }
+.main::before { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.45)),
+    radial-gradient(900px 600px at 15% -10%, rgba(200,255,0,.04), transparent 70%),
+    radial-gradient(900px 600px at 90% 110%, rgba(0,212,180,.04), transparent 70%);
+}
+.scene-shell { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.scene-shell.out { pointer-events: none; }
+.scene-shell.out .scene { animation: scene-out .26s ease both; }
+.scene { flex: 1; display: flex; flex-direction: column; padding: 40px 48px; animation: scene-in .4s ease both; min-height: 0; position: relative; z-index: 1; }
 .scene-full { padding: 0; align-items: center; justify-content: center; }
 
 .scene-head { margin-bottom: 24px; }
@@ -97,8 +112,11 @@ input { font-family: inherit; }
 /* ---------- Buttons ---------- */
 .btn { font-family: var(--font-d); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border-radius: 12px; padding: 16px 32px; font-size: 24px; transition: transform .12s, box-shadow .2s, background .2s; }
 .btn:active { transform: scale(.97); }
-.btn-primary { background: var(--acc); color: #0d1117; }
-.btn-primary:hover { box-shadow: 0 8px 30px var(--acc-glow); }
+.btn-primary { background: var(--acc); color: #0d1117; position: relative; overflow: hidden; }
+.btn-primary::after { content: ''; position: absolute; top: 0; bottom: 0; left: -75%; width: 50%; background: linear-gradient(105deg, transparent, rgba(255,255,255,.35), transparent); transform: skewX(-20deg); transition: left .6s ease; pointer-events: none; }
+.btn-primary:hover { box-shadow: 0 8px 30px var(--acc-glow); transform: translateY(-2px); }
+.btn-primary:hover::after { left: 125%; }
+.btn-primary:active { transform: scale(.97); }
 .btn-ghost { background: rgba(255,255,255,0.06); color: var(--text); border: 1px solid var(--line2); }
 .btn-ghost:hover { background: rgba(255,255,255,0.12); }
 .btn-good { background: transparent; color: var(--good); border: 2px solid var(--good); }
@@ -147,9 +165,18 @@ input { font-family: inherit; }
 .add-mgr:disabled { opacity: .35; }
 
 /* ---------- Announce ---------- */
-.announce { text-align: center; max-width: 1100px; }
+.announce { text-align: center; max-width: 1100px; position: relative; z-index: 1; }
 .announce .season-no { color: var(--teal); font-family: var(--font-d); font-weight: 600; letter-spacing: 4px; font-size: 26px; text-transform: uppercase; }
-.announce .big-year { font-family: var(--font-d); font-weight: 800; font-size: 200px; color: var(--acc); line-height: 0.9; margin: 8px 0; }
+.announce .big-year { font-family: var(--font-d); font-weight: 800; font-size: 200px; color: var(--acc); line-height: 0.9; margin: 8px 0; animation: year-slam .55s cubic-bezier(.2,1.3,.4,1) both, year-glow .8s ease .45s both; }
+/* ambient announce background */
+.announce-bg { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.bg-blob { position: absolute; width: 900px; height: 900px; border-radius: 50%; filter: blur(90px); }
+.bg-blob.a { background: radial-gradient(circle, rgba(200,255,0,.07), transparent 65%); top: -220px; left: -160px; animation: bg-drift 18s ease-in-out infinite alternate; }
+.bg-blob.b { background: radial-gradient(circle, rgba(0,212,180,.07), transparent 65%); bottom: -260px; right: -160px; animation: bg-drift 26s ease-in-out infinite alternate-reverse; }
+.bg-pitch { position: absolute; left: 50%; top: 50%; width: 900px; height: 900px; margin: -450px 0 0 -450px; border: 2px solid rgba(255,255,255,.04); border-radius: 50%; animation: slow-spin 60s linear infinite; }
+.bg-pitch::before { content: ''; position: absolute; left: -300px; right: -300px; top: 50%; border-top: 2px solid rgba(255,255,255,.04); }
+.slam { display: inline-block; position: relative; animation: badge-slam .5s cubic-bezier(.3,1.2,.4,1) .35s both; }
+.slam::after { content: ''; position: absolute; inset: -8px; border-radius: 18px; animation: shockwave .7s ease-out .85s 1 both; }
 .announce .tagline { font-size: 30px; color: var(--text); margin-top: 18px; }
 .announce .stat-preview { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 30px; }
 .announce .sp-pill { background: var(--surface); border: 1px solid var(--line2); border-radius: 999px; padding: 12px 24px; font-family: var(--font-d); font-weight: 600; font-size: 22px; color: var(--teal); }
@@ -157,7 +184,14 @@ input { font-family: inherit; }
 
 /* ---------- Draft ---------- */
 .draft-cards { display: grid; gap: 16px; flex: 1; min-height: 0; grid-auto-rows: 1fr; }
-.draft-card { background: var(--surface); border-radius: var(--r); border: 2px solid var(--line2); display: flex; flex-direction: column; padding: 22px 20px; cursor: pointer; transition: transform .15s, box-shadow .15s, border-color .15s; position: relative; overflow: hidden; }
+.draft-card { background: var(--surface); border-radius: var(--r); border: 2px solid var(--line2); display: flex; flex-direction: column; padding: 22px 20px; cursor: pointer; transition: transform .15s, box-shadow .15s, border-color .15s; position: relative; overflow: hidden; animation: deal-in .45s cubic-bezier(.2,.9,.3,1.15) both; animation-delay: calc(min(var(--i, 0), 9) * 65ms); }
+/* value tiers */
+.draft-card.tier-gold   { border-color: rgba(255,215,94,.55); box-shadow: inset 0 0 24px rgba(255,215,94,.10), 0 0 18px rgba(255,215,94,.08); }
+.draft-card.tier-silver { border-color: rgba(174,191,214,.45); }
+.draft-card.tier-bronze { border-color: rgba(168,112,69,.5); }
+.draft-card.tier-gold .dc-val   { color: #ffd75e; }
+.draft-card.tier-silver .dc-val { color: #dbe6f5; }
+.draft-card.tier-bronze .dc-val { color: #e0a878; }
 /* compact mode for >6 cards (wraps into two rows) */
 .draft-cards.compact { gap: 10px; }
 .draft-cards.compact .draft-card { padding: 12px 14px; border-width: 1px; border-radius: 12px; }
@@ -170,9 +204,9 @@ input { font-family: inherit; }
 .draft-cards.compact .stat-val { font-size: 21px; }
 .draft-cards.compact .stat-val.text { font-size: 14px; }
 .draft-cards.compact .stat-lbl { font-size: 12px; }
-.draft-card:hover:not(.drafted) { transform: translateY(-10px); box-shadow: 0 24px 60px rgba(0,0,0,0.5); border-color: var(--acc); }
+.draft-card:hover:not(.drafted) { transform: translateY(-10px) perspective(1000px) rotateX(2.5deg); box-shadow: 0 24px 60px rgba(0,0,0,0.5); border-color: var(--acc); }
 .draft-card.drafted { opacity: .3; pointer-events: none; filter: grayscale(.7); }
-.draft-card.out { animation: drafted-out .55s cubic-bezier(.5,0,.75,0) both; }
+.draft-card.out { animation: drafted-out .55s cubic-bezier(.4,0,.7,.2) both; }
 .dc-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .dc-num { width: 30px; height: 30px; border-radius: 8px; background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-family: var(--font-d); font-weight: 700; font-size: 18px; color: var(--text-dim); }
 .dc-val { font-family: var(--font-d); font-weight: 800; font-size: 50px; text-align: center; margin: 2px 0 12px; }
@@ -199,13 +233,16 @@ input { font-family: inherit; }
 .pitch-slot.empty .slot-circle { border-style: dashed; background: rgba(0,0,0,0.18); color: rgba(255,255,255,0.6); }
 .pitch-slot.filled .slot-circle { background: var(--acc); color: #0d1117; border-color: var(--acc); box-shadow: 0 0 0 6px var(--acc-glow); }
 .pitch-slot.sell .slot-circle { background: var(--bad); color: #fff; border-color: var(--bad); box-shadow: 0 0 0 6px rgba(239,68,68,0.3); }
+.pitch-slot.just .slot-circle { animation: slot-pop .45s cubic-bezier(.3,1.3,.4,1) both; }
+.pitch-slot.next-up .slot-circle { animation: pulse-ring 1.2s infinite; border-color: var(--acc); }
+.pitch.enter .pitch-slot { animation: rise .4s ease both; animation-delay: calc(var(--d, 0) * 70ms); }
 .pitch-slot.locked { opacity: 0.45; }
 .pitch-slot.locked .slot-circle { box-shadow: none; filter: grayscale(0.5); }
 .lock-badge { position: absolute; right: -4px; bottom: -4px; font-size: 22px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.6)); }
 .slot-silh { width: 54px; height: 54px; }
 .slot-pos { font-family: var(--font-d); font-weight: 700; font-size: 16px; color: #fff; background: rgba(0,0,0,0.35); padding: 1px 8px; border-radius: 6px; }
 .slot-val { font-family: var(--font-d); font-weight: 700; font-size: 22px; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.5); }
-.slot-name { font-family: var(--font-d); font-weight: 700; font-size: 18px; color: #fff; text-align: center; max-width: 110px; animation: rise .4s ease both; }
+.slot-name { font-family: var(--font-d); font-weight: 700; font-size: 18px; color: #fff; text-align: center; max-width: 110px; animation: id-flip .5s ease .15s both; }
 .slot-year { font-size: 13px; color: rgba(255,255,255,0.6); }
 .pitch-total { display: flex; justify-content: space-between; align-items: center; padding: 18px 28px; background: var(--surface); border-radius: 14px; margin-top: 14px; }
 .pitch-total .lbl { font-family: var(--font-d); font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); font-size: 20px; }
@@ -213,7 +250,17 @@ input { font-family: inherit; }
 
 /* ---------- Window reveal ---------- */
 .reveal-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; text-align: center; }
-.rv-card { background: var(--surface); border: 2px solid var(--line2); border-radius: 20px; padding: 40px 60px; min-width: 480px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.reveal-stage.shake { animation: shake .45s ease both; }
+.rv-card { background: var(--surface); border: 2px solid var(--line2); border-radius: 20px; padding: 40px 60px; min-width: 480px; display: flex; flex-direction: column; align-items: center; gap: 14px; transition: border-color .4s, box-shadow .4s; }
+.rv-card.revealed { border-color: var(--acc); box-shadow: 0 0 40px var(--acc-glow); }
+.rv-line.pop, .rv-card.pop { animation: pop-in .5s ease both; }
+.flash { position: absolute; inset: 0; pointer-events: none; z-index: 9; animation: flash-out .6s ease-out both; }
+.flash.good { background: radial-gradient(circle, rgba(34,197,94,.28), transparent 70%); }
+.flash.bad  { background: radial-gradient(circle, rgba(239,68,68,.30), transparent 70%); }
+.rv-profit-wrap { position: relative; text-align: center; }
+.rv-profit-wrap::before { content: ''; position: absolute; inset: -40px -90px; z-index: -1; border-radius: 50%; filter: blur(12px); animation: pop-in .5s ease both; }
+.rv-profit-wrap.good::before { background: radial-gradient(ellipse, rgba(34,197,94,.22), transparent 70%); }
+.rv-profit-wrap.bad::before  { background: radial-gradient(ellipse, rgba(239,68,68,.22), transparent 70%); }
 .rv-silh { width: 140px; height: 140px; }
 .rv-name { font-family: var(--font-d); font-weight: 800; font-size: 56px; text-transform: uppercase; animation: id-flip .5s ease both; }
 .rv-club { color: var(--text-dim); font-size: 22px; }
@@ -233,7 +280,11 @@ input { font-family: inherit; }
 .podium-row { display: flex; align-items: flex-end; justify-content: center; gap: 24px; margin-bottom: 40px; }
 .podium { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .podium .pod-av { width: 80px; height: 80px; font-size: 34px; }
-.podium .pod-block { background: var(--surface); border-radius: 14px 14px 0 0; width: 200px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 18px; border: 1px solid var(--line2); border-bottom: none; }
+.podium .pod-block { background: var(--surface); border-radius: 14px 14px 0 0; width: 200px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 18px; border: 1px solid var(--line2); border-bottom: none; transform-origin: bottom; animation: podium-rise .55s cubic-bezier(.2,1.1,.4,1) both; }
+.podium { animation: rise .5s ease both; }
+.podium.p3, .podium.p3 .pod-block { animation-delay: .1s; }
+.podium.p2, .podium.p2 .pod-block { animation-delay: .35s; }
+.podium.p1, .podium.p1 .pod-block { animation-delay: .65s; }
 .podium.p1 .pod-block { height: 220px; border-color: var(--acc); background: linear-gradient(180deg, var(--acc-glow), var(--surface)); }
 .podium.p2 .pod-block { height: 160px; }
 .podium.p3 .pod-block { height: 120px; }
@@ -245,18 +296,49 @@ input { font-family: inherit; }
 .standings-table td { padding: 16px 18px; border-bottom: 1px solid var(--line); font-size: 22px; }
 .standings-table .num { font-family: var(--font-d); font-weight: 700; font-variant-numeric: tabular-nums; }
 .standings-table tr.win td { background: var(--acc-glow); }
-.win-banner { text-align: center; }
+.win-banner { text-align: center; animation: pop-in .5s ease 1s both; }
 .win-banner .display { font-size: 110px; color: var(--acc); }
+.standings-table tr.revealed { animation: rise .4s ease both; }
+.drumroll { animation: drum-blink .9s ease-in-out infinite; }
 
 .hint { color: var(--text-faint); font-size: 16px; margin-top: 10px; text-align: center; }
 
+/* ---------- Advance hint + turn chip ---------- */
+.advance-chip-row { display: flex; justify-content: center; margin-top: 16px; }
+.advance-chip { display: inline-flex; align-items: center; gap: 10px; color: var(--text-dim); font-size: 17px; background: rgba(255,255,255,.04); border: 1px solid var(--line); border-radius: 999px; padding: 8px 20px; animation: chip-pulse 1.8s ease-in-out infinite; }
+.keycap { font-family: var(--font-d); font-weight: 700; font-size: 15px; letter-spacing: 1px; text-transform: uppercase; border: 1px solid var(--line2); border-bottom-width: 3px; border-radius: 6px; padding: 1px 10px; color: var(--text); background: rgba(255,255,255,.06); }
+.turn-chip { display: inline-flex; align-items: center; gap: 12px; background: var(--acc-glow); border: 1px solid var(--acc); border-radius: 999px; padding: 8px 24px 8px 8px; animation: pop-in .4s ease both; }
+.turn-chip .avatar { background: var(--acc); color: #0d1117; animation: pulse-ring 1.6s infinite; }
+.turn-chip .tc-name { font-family: var(--font-d); font-weight: 700; font-size: 26px; line-height: 1; }
+.turn-chip .tc-lbl { font-size: 13px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); }
+
+/* ---------- Focus + reduced motion ---------- */
+.btn:focus-visible, input:focus-visible, .draft-card:focus-visible, .shelf-card:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
 /* ---------- Animations ---------- */
-@keyframes scene-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes scene-in { from { opacity: 0; transform: translateY(14px) scale(.99); } to { opacity: 1; transform: none; } }
+@keyframes scene-out { to { opacity: 0; transform: translateY(-16px) scale(.985); } }
 @keyframes rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
 @keyframes drafted-out { to { opacity: 0; transform: translateX(70px) rotate(5deg); flex-grow: 0.01; padding-left: 0; padding-right: 0; } }
+@keyframes deal-in { from { opacity: 0; transform: translateY(46px) rotate(-2deg) scale(.93); } }
+@keyframes bg-drift { from { transform: translate(0, 0) scale(1); } to { transform: translate(120px, 60px) scale(1.15); } }
+@keyframes slow-spin { to { transform: rotate(360deg); } }
+@keyframes year-slam { 0% { transform: scale(1.6); opacity: 0; filter: blur(6px); } 100% { transform: scale(1); opacity: 1; filter: blur(0); } }
+@keyframes year-glow { to { text-shadow: 0 0 70px var(--acc-glow); } }
+@keyframes badge-slam { 0% { transform: scale(2.6) rotate(-4deg); opacity: 0; } 60% { transform: scale(.92) rotate(0deg); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes shockwave { from { box-shadow: 0 0 0 0 var(--acc-glow); opacity: 1; } to { box-shadow: 0 0 0 44px rgba(200,255,0,0); opacity: 0; } }
 @keyframes id-flip { from { transform: rotateY(90deg); opacity: 0; } to { transform: rotateY(0); opacity: 1; } }
 @keyframes pop-in { 0% { transform: scale(.5); opacity: 0; } 70% { transform: scale(1.12); } 100% { transform: scale(1); opacity: 1; } }
 @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 var(--acc-glow); } 70% { box-shadow: 0 0 0 12px rgba(200,255,0,0); } 100% { box-shadow: 0 0 0 0 rgba(200,255,0,0); } }
+@keyframes slot-pop { 0% { transform: scale(.3); } 70% { transform: scale(1.18); box-shadow: 0 0 0 14px var(--acc-glow); } 100% { transform: scale(1); } }
+@keyframes flash-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes shake { 0%, 100% { transform: none; } 20% { transform: translateX(-9px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(3px); } }
+@keyframes podium-rise { from { transform: scaleY(0); opacity: 0; } }
+@keyframes drum-blink { 50% { opacity: .25; } }
+@keyframes chip-pulse { 50% { opacity: .55; transform: translateY(2px); } }
 </style>
 </head>
 <body>
@@ -628,6 +710,9 @@ function applySoldMoney(state) {
    SHARED COMPONENTS
    ========================================================================= */
 
+// Card value tiers (thresholds from the inlined pools: p85 ≈ €60M, median ≈ €35M)
+function tierOf(v) { return v >= 60 ? 'tier-gold' : v >= 25 ? 'tier-silver' : 'tier-bronze'; }
+
 function PosBadge({ pos, size }) {
   return <span className={'pos-badge' + (size ? ' ' + size : '')}>{POS_LABEL[pos] || pos}</span>;
 }
@@ -647,6 +732,28 @@ function StatRow({ label, value }) {
 function Money({ value, run, ms, className }) {
   const v = useCountUp(value, run, ms);
   return <span className={'mono-num ' + (className || '')}>{fmtM(v)}</span>;
+}
+
+function AdvanceHint({ children }) {
+  return (
+    <div className="advance-chip-row">
+      <span className="advance-chip"><span className="keycap">Space</span> or click — {children}</span>
+    </div>
+  );
+}
+
+// Big "whose turn" chip — the sidebar highlight alone is too peripheral on a TV.
+// Keyed by mgr.id so it pops on every handover.
+function TurnChip({ mgr }) {
+  return (
+    <div className="turn-chip">
+      <div className="avatar">{mgr.name.charAt(0).toUpperCase()}</div>
+      <div>
+        <div className="tc-name">{mgr.name}</div>
+        <div className="tc-lbl">On the clock</div>
+      </div>
+    </div>
+  );
 }
 
 /* =========================================================================
@@ -747,25 +854,30 @@ function AnnounceScreen({ state, dispatch }) {
   const statKeys = !isWindow ? STAT_KEYS[se.pos] : null;
   return (
     <div className="scene scene-full" onClick={advance}>
+      <div className="announce-bg">
+        <div className="bg-blob a" />
+        <div className="bg-blob b" />
+        <div className="bg-pitch" />
+      </div>
       <div className="announce">
         <div className="season-no rise">Season {se.step + 1} · {se.yr}</div>
         <div className="big-year">{Math.round(yearNum)}/{(Math.round(yearNum)+1).toString().slice(2)}</div>
-        <div className="rise" style={{ animationDelay: '.1s' }}>
+        <div className="slam">
           {isWindow
             ? <PosBadge pos="⇄" size="lg" />
             : <span className="pos-badge lg">{POS_LABEL[se.pos]}</span>}
         </div>
-        <div className="tagline rise" style={{ animationDelay: '.2s' }}>
+        <div className="tagline rise" style={{ animationDelay: '.55s' }}>
           {isWindow ? `Transfer Window ${se.window} — hold or cash out` : `Time to scout a ${se.label}`}
         </div>
         {!isWindow && (
           <div className="stat-preview">
             {statKeys.map((k, i) => (
-              <div key={k} className="sp-pill rise" style={{ animationDelay: (0.3 + i*0.08) + 's' }}>{k}</div>
+              <div key={k} className="sp-pill rise" style={{ animationDelay: (0.65 + i*0.08) + 's' }}>{k}</div>
             ))}
           </div>
         )}
-        <div className="hint">Click anywhere or press Space →</div>
+        <AdvanceHint>continue</AdvanceHint>
       </div>
     </div>
   );
@@ -791,21 +903,25 @@ function DraftScreen({ state, dispatch }) {
 
   const intent = (i) => { if (!pickedThisRound.includes(pool[i].id) && state.outIdx == null) dispatch({ type: 'PICK_INTENT', cardIdx: i }); };
   // keyboard 1-9
+  const intentRef = useRef();
+  intentRef.current = (n) => { if (state.picking == null && n <= pool.length) intent(n - 1); };
   useEffect(() => {
     const h = (e) => {
-      if (state.picking != null) return;
       const n = parseInt(e.key);
-      if (n >= 1 && n <= 9 && n <= pool.length) intent(n - 1);
+      if (n >= 1 && n <= 9) intentRef.current(n);
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  });
+  }, []);
 
   return (
     <div className="scene">
-      <div className="scene-head">
-        <div className="h1">The Board</div>
-        <div className="sub"><span style={{color:'var(--acc)',fontWeight:700}}>{mgr.name}</span> — pick your {se.label}. Stats only, no names.</div>
+      <div className="scene-head" style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <div>
+          <div className="h1">The Board</div>
+          <div className="sub">Pick your {se.label}. Stats only, no names.</div>
+        </div>
+        <TurnChip key={mgr.id} mgr={mgr} />
       </div>
       <div className={'draft-cards' + (compact ? ' compact' : '')} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
         {pool.map((p, i) => {
@@ -813,7 +929,8 @@ function DraftScreen({ state, dispatch }) {
           const out = state.outIdx === i;
           return (
             <div key={p.id}
-                 className={'draft-card' + (drafted ? ' drafted' : '') + (out ? ' out' : '')}
+                 className={'draft-card ' + tierOf(p.buyVal) + (drafted ? ' drafted' : '') + (out ? ' out' : '')}
+                 style={{ '--i': i }}
                  onClick={() => intent(i)}>
               <div className="dc-top">
                 <PosBadge pos={pos} />
@@ -865,7 +982,7 @@ function PitchFormation({ mgr, mode, state, dispatch }) {
 
   return (
     <div className="pitch-wrap">
-      <div className="pitch">
+      <div className={'pitch' + (mode === 'view' ? ' enter' : '')}>
         {cols.map((col, ci) => (
           <div key={ci} className="pitch-col">
             {col.map(slot => {
@@ -882,7 +999,7 @@ function PitchFormation({ mgr, mode, state, dispatch }) {
               if (sellable) cls += ' clickable';
               if (locked) cls += ' locked';
               return (
-                <div key={slot.posKey} className={cls}
+                <div key={slot.posKey} className={cls} style={{ '--d': ci }}
                      onClick={() => sellable && dispatch({ type: 'WINDOW_TOGGLE', playerId: slot.player.id })}>
                   <div className="slot-circle">
                     {slot.player ? <Silhouette className="slot-silh" /> : POS_LABEL[slot.posKey]}
@@ -920,7 +1037,7 @@ function SquadScreen({ state, dispatch }) {
   useKey(' ', advance); useKey('Enter', advance);
 
   return (
-    <div className="scene">
+    <div className="scene" onClick={advance}>
       <div className="scene-head" style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end' }}>
         <div>
           <div className="h1">Squad — {mgr.name}</div>
@@ -928,9 +1045,9 @@ function SquadScreen({ state, dispatch }) {
         </div>
         <div className="sub" style={{ alignSelf:'center' }}>Team {idx + 1} of {state.managers.length}</div>
       </div>
-      <PitchFormation mgr={mgr} mode="view" state={state} dispatch={dispatch} />
+      <PitchFormation key={mgr.id} mgr={mgr} mode="view" state={state} dispatch={dispatch} />
       <div className="cta-row">
-        <button className="btn btn-primary btn-lg" onClick={advance}>
+        <button className="btn btn-primary btn-lg" onClick={e => { e.stopPropagation(); advance(); }}>
           {last ? 'Continue →' : `Next: ${state.managers[idx + 1].name} →`}
         </button>
       </div>
@@ -944,9 +1061,12 @@ function WindowDecideScreen({ state, dispatch }) {
   const nSell = Object.keys(state.windowSel).length;
   return (
     <div className="scene">
-      <div className="scene-head">
-        <div className="h1">Window {se.window} — {mgr.name}</div>
-        <div className="sub">Sell any of your original picks — replacements signed in a past window (🔒) can't be sold. Tap players to mark them for SALE.</div>
+      <div className="scene-head" style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <div>
+          <div className="h1">Window {se.window}</div>
+          <div className="sub">Sell any of your original picks — replacements signed in a past window (🔒) can't be sold. Tap players to mark them for SALE.</div>
+        </div>
+        <TurnChip key={mgr.id} mgr={mgr} />
       </div>
       <PitchFormation mgr={mgr} mode="sell" state={state} dispatch={dispatch} />
       <div className="cta-row">
@@ -977,17 +1097,18 @@ function WindowRevealScreen({ state, dispatch }) {
 
   return (
     <div className="scene scene-full" onClick={advance}>
-      <div className="reveal-stage">
+      {stage >= 3 && <div key={state.revealIdx} className={'flash ' + (profit >= 0 ? 'good' : 'bad')} />}
+      <div className={'reveal-stage' + (stage === 3 && profit < 0 ? ' shake' : '')}>
         <div className="kicker">{mgr.name} · {posLbl} · bought {SEASON_SEQUENCE.find(s=>s.pos===p.pos)?.yr}</div>
 
         {/* SOLD player identity card */}
-        <div className="rv-card">
+        <div className={'rv-card' + (stage >= 2 ? ' revealed' : '')}>
           {stage >= 2
             ? <><div className="rv-name">{p.name}</div><div className="rv-club">{p.club}</div></>
             : <Silhouette className="rv-silh" />}
           <div className="rv-line"><span className="l">Bought</span><span className="v">{fmtM(p.buyVal)}</span></div>
           {stage >= 1 && (
-            <div className="rv-line"><span className="l">Sold</span>
+            <div className="rv-line pop"><span className="l">Sold</span>
               <Money value={p.sellVal} run={true} className="v" />
             </div>
           )}
@@ -995,7 +1116,7 @@ function WindowRevealScreen({ state, dispatch }) {
 
         {/* sale profit / loss */}
         {stage >= 3 && (
-          <div style={{ textAlign:'center' }}>
+          <div className={'rv-profit-wrap ' + (profit >= 0 ? 'good' : 'bad')}>
             <div className={'rv-profit ' + (profit >= 0 ? 'good' : 'bad')}>{profit>=0?'+':''}{fmtM(profit)}</div>
             <div className="rv-profit-lbl">{profit >= 0 ? 'Profit' : 'Loss'} on sale</div>
           </div>
@@ -1003,7 +1124,7 @@ function WindowRevealScreen({ state, dispatch }) {
 
         {/* replacement old → new market value (identity stays hidden) */}
         {repl && stage >= 4 && (
-          <div className="rv-card" style={{ minWidth: 480 }}>
+          <div className="rv-card pop" style={{ minWidth: 480 }}>
             <div className="kicker">Your replacement {posLbl}</div>
             <Silhouette className="rv-silh" style={{ width: 96, height: 96 }} />
             <div className="rv-line"><span className="l">Was</span><span className="v" style={{ color:'var(--text-dim)' }}>{fmtM(repl.buyVal)}</span></div>
@@ -1013,10 +1134,10 @@ function WindowRevealScreen({ state, dispatch }) {
           </div>
         )}
 
-        <div className="hint">
-          {stage < maxStage ? 'Click to reveal next →'
-            : lastSold ? 'Click to view squad →' : 'Click for the next sale →'}
-        </div>
+        <AdvanceHint>
+          {stage < maxStage ? 'reveal next'
+            : lastSold ? 'view squads' : 'next sale'}
+        </AdvanceHint>
       </div>
     </div>
   );
@@ -1041,7 +1162,7 @@ function ReplacePickScreen({ state, dispatch }) {
       </div>
       <div className={'draft-cards' + (compact ? ' compact' : '')} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
         {shelf.map((p, i) => (
-          <div key={p.id} className="draft-card" onClick={() => setPicking(i)}>
+          <div key={p.id} className={'draft-card ' + tierOf(p.buyVal)} style={{ '--i': i }} onClick={() => setPicking(i)}>
             <div className="dc-top"><PosBadge pos={pos} /><div className="dc-num">{i + 1}</div></div>
             <div className="dc-val">{fmtM(p.buyVal)}</div>
             <Silhouette className="dc-silh" />
@@ -1103,13 +1224,16 @@ function FinalRevealScreen({ state, dispatch }) {
             <div key={ci} className="pitch-col">
               {col.map(slot => {
                 const revealed = finalPosRevealed(state, slot.posKey);
+                const just = slot.posKey === PITCH_ORDER[state.finalIdx];
+                const nextUp = !state.finalProfit && slot.posKey === PITCH_ORDER[state.finalIdx + 1];
                 const p = slot.player;
                 // Part 2 (profit pass): each slot shows its gain/loss vs what was paid.
                 // Replacements were bought at current market value, so they net €0.
                 const net = p ? p.curVal - (mgr.locked[slot.posKey] ? p.sellVal : p.buyVal) : 0;
                 return (
-                  <div key={slot.posKey} className={'pitch-slot ' + (p ? (revealed?'filled':'empty') : 'empty')}>
-                    <div className="slot-circle">
+                  <div key={slot.posKey}
+                       className={'pitch-slot ' + (p ? (revealed?'filled':'empty') : 'empty') + (just ? ' just' : '') + (nextUp ? ' next-up' : '')}>
+                    <div className="slot-circle" key={revealed ? 'on' : 'off'}>
                       {p && revealed ? <Silhouette className="slot-silh" /> : POS_LABEL[slot.posKey]}
                     </div>
                     <span className="slot-pos">{POS_LABEL[slot.posKey]}</span>
@@ -1118,7 +1242,7 @@ function FinalRevealScreen({ state, dispatch }) {
                           ? <>
                               <span className="slot-name">{p.name}</span>
                               {state.finalProfit
-                                ? <span className="slot-val" style={{ color: net >= 0 ? 'var(--good)' : 'var(--bad)' }}>{net >= 0 ? '+' : ''}{fmtM(net)}</span>
+                                ? <span className="slot-val" style={{ color: net >= 0 ? 'var(--good)' : 'var(--bad)' }}>{net >= 0 ? '+' : ''}<Money value={net} run={true} ms={600} /></span>
                                 : <span className="slot-val">{fmtM(p.curVal)}</span>}
                             </>
                           : <span className="slot-val">€?M</span>)
@@ -1134,14 +1258,59 @@ function FinalRevealScreen({ state, dispatch }) {
           <span className="amt mono-num" style={{ color: tween < 0 ? 'var(--bad)' : 'var(--acc)' }}>{fmtM(tween)}</span>
         </div>
       </div>
-      <div className="hint">
-        {state.finalIdx < PITCH_ORDER.length - 1 ? 'Click to reveal next position →'
-          : !state.finalProfit ? 'Click to reveal each player’s profit / loss →'
-          : state.finalMgr < state.managers.length - 1 ? `Click to reveal ${state.managers[state.finalMgr + 1].name}’s squad →`
-          : 'Click to see final standings →'}
-      </div>
+      <AdvanceHint>
+        {state.finalIdx < PITCH_ORDER.length - 1 ? 'reveal next position'
+          : !state.finalProfit ? 'reveal each player’s profit / loss'
+          : state.finalMgr < state.managers.length - 1 ? `reveal ${state.managers[state.finalMgr + 1].name}’s squad`
+          : 'see final standings'}
+      </AdvanceHint>
     </div>
   );
+}
+
+// Winner celebration: pure-canvas confetti over the full 1920×1080 stage.
+// position:fixed resolves against the transformed #root, so it scales with the stage.
+function Confetti() {
+  const ref = useRef(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width = 1920, H = canvas.height = 1080;
+    const colors = ['#c8ff00', '#00d4b4', '#ffffff', '#ffd75e'];
+    const parts = [];
+    const spawn = () => parts.push({
+      x: Math.random() * W, y: -30 - Math.random() * 120,
+      vx: (Math.random() - .5) * 3, vy: 2 + Math.random() * 3.5,
+      w: 8 + Math.random() * 6, h: 5 + Math.random() * 5,
+      rot: Math.random() * Math.PI, vr: (Math.random() - .5) * .25,
+      color: colors[(Math.random() * colors.length) | 0],
+    });
+    for (let i = 0; i < 60; i++) spawn();
+    const start = performance.now();
+    let raf;
+    const tick = () => {
+      const elapsed = performance.now() - start;
+      if (elapsed < 2500 && parts.length < 160) spawn();
+      ctx.clearRect(0, 0, W, H);
+      for (let i = parts.length - 1; i >= 0; i--) {
+        const p = parts[i];
+        p.vy = Math.min(p.vy + 0.12, 7.5);
+        p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+        if (p.y > H + 40) { parts.splice(i, 1); continue; }
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        ctx.restore();
+      }
+      if (parts.length > 0 || elapsed < 2500) raf = requestAnimationFrame(tick);
+      else ctx.clearRect(0, 0, W, H);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  return <canvas ref={ref} style={{ position: 'fixed', left: 0, top: 0, width: 1920, height: 1080, pointerEvents: 'none', zIndex: 50 }} />;
 }
 
 function StandingsScreen({ state, dispatch }) {
@@ -1157,6 +1326,7 @@ function StandingsScreen({ state, dispatch }) {
 
   return (
     <div className="scene scene-full" onClick={() => !allRevealed && advance()}>
+      {allRevealed && <Confetti />}
       <div style={{ width:'100%', maxWidth:1200 }} onClick={e => e.stopPropagation()}>
         {allRevealed && (
           <div className="win-banner rise" style={{ marginBottom: 24 }}>
@@ -1182,15 +1352,17 @@ function StandingsScreen({ state, dispatch }) {
           <thead><tr><th>#</th><th>Manager</th><th>Squad Value</th><th>Sales Profit</th><th>Total</th></tr></thead>
           <tbody>
             {ranked.map((r, i) => {
-              const show = i < state.standRevealed || allRevealed;
+              // Reveal bottom-up (worst → winner) for tension.
+              const show = i >= ranked.length - state.standRevealed || allRevealed;
+              const drumroll = !allRevealed && i === ranked.length - state.standRevealed - 1;
               return (
-                <tr key={r.m.id} className={allRevealed && i === 0 ? 'win' : ''}>
+                <tr key={r.m.id} className={(allRevealed && i === 0 ? 'win' : '') + (show ? ' revealed' : '')}>
                   <td className="num">{i + 1}</td>
                   <td>{r.m.name}</td>
                   <td className="num">{fmtM(r.sq)}</td>
                   <td className="num">{fmtM(r.m.bankedProfit)}</td>
-                  <td className="num" style={{ color: show ? (r.score>=0?'var(--acc)':'var(--bad)') : 'var(--text-faint)', fontWeight:800 }}>
-                    {show ? fmtM(r.score) : '€??M'}
+                  <td className={'num' + (drumroll ? ' drumroll' : '')} style={{ color: show ? (r.score>=0?'var(--acc)':'var(--bad)') : 'var(--text-faint)', fontWeight:800 }}>
+                    {show ? <Money value={r.score} run={true} ms={700} /> : '€??M'}
                   </td>
                 </tr>
               );
@@ -1212,16 +1384,56 @@ function StandingsScreen({ state, dispatch }) {
    ========================================================================= */
 
 function useKey(key, fn) {
+  const ref = useRef(fn);
+  ref.current = fn;
   useEffect(() => {
-    const h = (e) => { if (e.key === key) { e.preventDefault(); fn(); } };
+    const h = (e) => { if (e.key === key) { e.preventDefault(); ref.current(); } };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  });
+  }, [key]);
+}
+
+// Scale the fixed 1920×1080 stage to fit the window (letterboxed on non-16:9)
+function useStageScale() {
+  useEffect(() => {
+    const fit = () => {
+      const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+      document.getElementById('root').style.transform = `translate(-50%, -50%) scale(${s})`;
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, []);
+}
+
+// Deferred-swap scene transition: on key change, play the exit animation on the
+// frozen old scene, then mount the new one (which plays scene-in). gateRef blocks
+// dispatch during the out-phase so Space-mashing can't double-advance.
+function SceneShell({ sceneKey, gateRef, children }) {
+  const [shown, setShown] = useState(sceneKey);
+  const [out, setOut] = useState(false);
+  const last = useRef(children);
+  if (sceneKey === shown && !out) last.current = children;
+  useEffect(() => {
+    if (sceneKey === shown) { setOut(false); gateRef.current = false; return; }
+    setOut(true);
+    gateRef.current = true;
+    const t = setTimeout(() => { setShown(sceneKey); setOut(false); gateRef.current = false; }, 260);
+    return () => clearTimeout(t);
+  }, [sceneKey, shown]);
+  return (
+    <div className={'scene-shell' + (out ? ' out' : '')}>
+      {sceneKey === shown ? children : last.current}
+    </div>
+  );
 }
 
 function App() {
-  const [state, dispatch] = useReducer(reducer, initial);
+  const [state, rawDispatch] = useReducer(reducer, initial);
+  const gateRef = useRef(false);
+  const dispatch = useCallback((a) => { if (!gateRef.current) rawDispatch(a); }, []);
   const showSidebar = state.state !== 'SETUP';
+  useStageScale();
 
   let screen;
   switch (state.state) {
@@ -1240,7 +1452,9 @@ function App() {
   return (
     <>
       {showSidebar && <Sidebar state={state} />}
-      <main className="main">{screen}</main>
+      <main className="main">
+        <SceneShell sceneKey={state.state} gateRef={gateRef}>{screen}</SceneShell>
+      </main>
     </>
   );
 }
