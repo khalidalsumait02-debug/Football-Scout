@@ -499,6 +499,17 @@ function scoreOf(mgr) {
   }, 0);
   return heldGain + mgr.bankedProfit;
 }
+// Ranking metric: return on investment — net profit relative to total money spent.
+// Normalises for capital, so cheap-gem squads compete fairly with superstar squads.
+function roiOf(mgr) {
+  return mgr.totalSpent > 0 ? scoreOf(mgr) / mgr.totalSpent : 0;
+}
+function fmtPct(v) {
+  const p = v * 100;
+  const a = Math.abs(p);
+  const s = a >= 100 ? Math.round(a).toString() : a.toFixed(1);
+  return (p < 0 ? '−' : '+') + s + '%';
+}
 // What a manager paid for the player currently in a slot: draft value for an original
 // pick, or the window-year price paid for a redrafted replacement. Spoiler-free —
 // these are the figures the manager already saw when acquiring the player.
@@ -521,17 +532,20 @@ const initial = {
   managers: [],
   shelf: {},          // { pos: [player, ...] }  remaining undrafted cards
   board: [],          // the cards drawn for the current draft round
-  draftIdx: 0,        // which manager is picking this round
+  draftIdx: 0,        // which manager is picking right now (rotates per season)
+  picksDone: 0,       // picks made so far this draft round
   picking: null,      // card index pending confirmation
   outIdx: null,       // card index animating out
-  windowMgr: 0,       // current manager in window decide
+  windowMgr: 0,       // current manager in window decide (rotates per season)
+  windowDone: 0,      // managers who have confirmed this window
   windowSel: {},      // { playerId: true } toggled-for-sale (current manager)
   sold: [],           // [{ mgrId, pos, player, replacementId|null }]
   revealIdx: 0,       // window reveal: which sold player
   revealStage: 0,     // window reveal: 0..6
   finalMgr: 0,        // final reveal: which manager is being revealed (one at a time)
-  finalIdx: -1,       // final reveal: index into PITCH_ORDER (per-position aggregated)
-  finalProfit: false, // whether banked profits added on final screen
+  finalIdx: -1,       // final reveal: index into PITCH_ORDER
+  finalStage: 0,      // final reveal: 0 = identity shown, 1 = that player's profit shown
+  finalBanked: false, // whether banked transfer profit has been added for this manager
   standRevealed: 0,   // standings rows revealed
 };
 
@@ -550,14 +564,17 @@ function reducer(state, action) {
 
     case 'ANNOUNCE_DONE': {
       const se = curSeason(state);
+      // Fairness: the starting manager rotates each season on a fixed cycle, so
+      // everyone gets first pick (and first window slot) equally often.
+      const start = se.step % state.managers.length;
       // Start each window fresh — `sold` must not carry over from a previous window,
       // otherwise the reveal (revealIdx resets to 0) replays earlier windows' sales.
-      if (se.type === 'window') return { ...state, state: 'WINDOW_DECIDE', windowMgr: 0, windowSel: {}, sold: [] };
+      if (se.type === 'window') return { ...state, state: 'WINDOW_DECIDE', windowMgr: start, windowDone: 0, windowSel: {}, sold: [] };
       // Draw the board for this draft: max(5, 2×managers) random cards from the deep pool.
       const pool = DRAFT_POOLS[se.pos];
       const n = Math.min(pool.length, Math.max(5, 2 * state.managers.length));
       const board = weightedSample(pool, n, draftWeight);
-      return { ...state, state: 'DRAFT', draftIdx: 0, picking: null, outIdx: null, board };
+      return { ...state, state: 'DRAFT', draftIdx: start, picksDone: 0, picking: null, outIdx: null, board };
     }
 
     case 'PICK_INTENT':
@@ -581,9 +598,10 @@ function reducer(state, action) {
     case 'PICK_OUT_DONE': {
       const se = curSeason(state);
       const pos = se.pos;
-      const nextIdx = state.draftIdx + 1;
-      if (nextIdx < state.managers.length) {
-        return { ...state, draftIdx: nextIdx, outIdx: null };
+      const n = state.managers.length;
+      const done = state.picksDone + 1;
+      if (done < n) {
+        return { ...state, draftIdx: (state.draftIdx + 1) % n, picksDone: done, outIdx: null };
       }
       // round done -> shelf = the drawn board minus the drafted cards
       const pickedIds = state.managers.map(m => m.squad[pos]);
@@ -594,7 +612,7 @@ function reducer(state, action) {
     case 'SQUAD_DONE': {
       const next = SEASON_SEQUENCE[state.seasonStep + 1];
       if (!next || next.type === 'reveal')
-        return { ...state, seasonStep: state.seasonStep + 1, state: 'FINAL_REVEAL', finalMgr: 0, finalIdx: -1, finalProfit: false };
+        return { ...state, seasonStep: state.seasonStep + 1, state: 'FINAL_REVEAL', finalMgr: 0, finalIdx: -1, finalStage: 0, finalBanked: false };
       return { ...state, seasonStep: state.seasonStep + 1, state: 'ANNOUNCE' };
     }
 
@@ -617,9 +635,10 @@ function reducer(state, action) {
         }
       });
       const sold = [...state.sold, ...newSold];
-      const nextMgr = state.windowMgr + 1;
-      if (nextMgr < state.managers.length) {
-        return { ...state, sold, windowMgr: nextMgr, windowSel: {} };
+      const n = state.managers.length;
+      const done = state.windowDone + 1;
+      if (done < n) {
+        return { ...state, sold, windowMgr: (state.windowMgr + 1) % n, windowDone: done, windowSel: {} };
       }
       // all managers decided
       if (sold.length === 0) {
@@ -649,12 +668,16 @@ function reducer(state, action) {
     }
 
     case 'FINAL_NEXT': {
-      // Reveal one manager fully (positions back-to-front, then the profit pass)
-      // before moving on to the next manager — one team at a time.
-      if (state.finalIdx < PITCH_ORDER.length - 1) return { ...state, finalIdx: state.finalIdx + 1 };
-      if (!state.finalProfit) return { ...state, finalProfit: true };
+      // Per player, two beats: identity first, then that player's profit — back to
+      // front, one manager fully revealed before the next. A final beat adds the
+      // manager's banked transfer profit (skipped when zero).
+      if (state.finalIdx === -1) return { ...state, finalIdx: 0, finalStage: 0 };
+      if (state.finalStage === 0) return { ...state, finalStage: 1 };
+      if (state.finalIdx < PITCH_ORDER.length - 1) return { ...state, finalIdx: state.finalIdx + 1, finalStage: 0 };
+      const mgr = state.managers[state.finalMgr];
+      if (!state.finalBanked && mgr.bankedProfit !== 0) return { ...state, finalBanked: true };
       if (state.finalMgr < state.managers.length - 1)
-        return { ...state, finalMgr: state.finalMgr + 1, finalIdx: -1, finalProfit: false };
+        return { ...state, finalMgr: state.finalMgr + 1, finalIdx: -1, finalStage: 0, finalBanked: false };
       return { ...state, state: 'STANDINGS', standRevealed: 0 };
     }
 
@@ -888,7 +911,9 @@ function DraftScreen({ state, dispatch }) {
   const pos = se.pos;
   const pool = state.board;
   const mgr = state.managers[state.draftIdx];
-  const pickedThisRound = state.managers.slice(0, state.draftIdx).map(m => m.squad[pos]);
+  // Order rotates, so "already picked" is anyone's filled slot for this position —
+  // except the card still animating out (it's in the squad but mid-flight).
+  const pickedThisRound = state.managers.map(m => m.squad[pos]).filter(Boolean);
   // Up to 6 cards in one row; more wraps into two rows. Compact shrinks the cards.
   const cols = pool.length <= 6 ? pool.length : Math.ceil(pool.length / 2);
   const compact = pool.length > 6;
@@ -919,14 +944,14 @@ function DraftScreen({ state, dispatch }) {
       <div className="scene-head" style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
         <div>
           <div className="h1">The Board</div>
-          <div className="sub">Pick your {se.label}. Stats only, no names.</div>
+          <div className="sub">Pick your {se.label}. Stats only, no names. · Pick {state.picksDone + 1} of {state.managers.length}</div>
         </div>
         <TurnChip key={mgr.id} mgr={mgr} />
       </div>
       <div className={'draft-cards' + (compact ? ' compact' : '')} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
         {pool.map((p, i) => {
-          const drafted = pickedThisRound.includes(p.id);
           const out = state.outIdx === i;
+          const drafted = pickedThisRound.includes(p.id) && !out;
           return (
             <div key={p.id}
                  className={'draft-card ' + tierOf(p.buyVal) + (drafted ? ' drafted' : '') + (out ? ' out' : '')}
@@ -1190,6 +1215,11 @@ function finalPosRevealed(state, posKey) {
   const idx = PITCH_ORDER.indexOf(posKey);
   return idx <= state.finalIdx;
 }
+// Per-player two-beat reveal: identity lands first, profit on the next click.
+function finalProfitShown(state, posKey) {
+  const idx = PITCH_ORDER.indexOf(posKey);
+  return idx < state.finalIdx || (idx === state.finalIdx && state.finalStage === 1);
+}
 function FinalRevealScreen({ state, dispatch }) {
   // Final reveal goes one team at a time (no tab switcher): the current manager is
   // revealed fully, then a click moves on to the next manager.
@@ -1197,16 +1227,19 @@ function FinalRevealScreen({ state, dispatch }) {
   const advance = () => dispatch({ type: 'FINAL_NEXT' });
   useKey(' ', advance); useKey('Enter', advance);
 
-  // running total: each slot adds its gain (curVal − buyVal for originals, 0 for locked replacements)
-  let running = mgr.bankedProfit * (state.finalProfit ? 1 : 0);
-  PITCH_ORDER.forEach((posKey, idx) => {
-    if (idx <= state.finalIdx) {
+  // running total: each slot adds its gain once its profit beat has landed
+  let running = state.finalBanked ? mgr.bankedProfit : 0;
+  PITCH_ORDER.forEach((posKey) => {
+    if (finalProfitShown(state, posKey)) {
       const pid = mgr.squad[posKey];
       const p = pid ? PLAYER_BY_ID[pid] : null;
       running += p ? p.curVal - (mgr.locked[posKey] ? p.sellVal : p.buyVal) : 0;
     }
   });
   const tween = useTween(running);
+  const lastPos = PITCH_ORDER.length - 1;
+  const positionsDone = state.finalIdx === lastPos && state.finalStage === 1;
+  const mgrDone = positionsDone && (state.finalBanked || mgr.bankedProfit === 0);
 
   const cols = pitchSlots(mgr);
   return (
@@ -1223,12 +1256,15 @@ function FinalRevealScreen({ state, dispatch }) {
           {cols.map((col, ci) => (
             <div key={ci} className="pitch-col">
               {col.map(slot => {
+                const pi = PITCH_ORDER.indexOf(slot.posKey);
                 const revealed = finalPosRevealed(state, slot.posKey);
-                const just = slot.posKey === PITCH_ORDER[state.finalIdx];
-                const nextUp = !state.finalProfit && slot.posKey === PITCH_ORDER[state.finalIdx + 1];
+                const profitShown = finalProfitShown(state, slot.posKey);
+                const just = pi === state.finalIdx;
+                const nextUp = (state.finalIdx === -1 && pi === 0) ||
+                               (state.finalStage === 1 && pi === state.finalIdx + 1);
                 const p = slot.player;
-                // Part 2 (profit pass): each slot shows its gain/loss vs what was paid.
-                // Replacements were bought at current market value, so they net €0.
+                // Profit beat: the slot's gain/loss vs what was paid. Replacements
+                // were bought at current market value, so they net €0 at purchase.
                 const net = p ? p.curVal - (mgr.locked[slot.posKey] ? p.sellVal : p.buyVal) : 0;
                 return (
                   <div key={slot.posKey}
@@ -1241,7 +1277,7 @@ function FinalRevealScreen({ state, dispatch }) {
                       ? (revealed
                           ? <>
                               <span className="slot-name">{p.name}</span>
-                              {state.finalProfit
+                              {profitShown
                                 ? <span className="slot-val" style={{ color: net >= 0 ? 'var(--good)' : 'var(--bad)' }}>{net >= 0 ? '+' : ''}<Money value={net} run={true} ms={600} /></span>
                                 : <span className="slot-val">{fmtM(p.curVal)}</span>}
                             </>
@@ -1253,14 +1289,24 @@ function FinalRevealScreen({ state, dispatch }) {
             </div>
           ))}
         </div>
+        {state.finalBanked && (
+          <div className="rise" style={{ textAlign: 'center', marginTop: 12 }}>
+            <span className="kicker">Transfer window profit&nbsp;&nbsp;</span>
+            <span className="mono-num" style={{ fontFamily: 'var(--font-d)', fontSize: 40, fontWeight: 800, color: mgr.bankedProfit >= 0 ? 'var(--good)' : 'var(--bad)' }}>
+              {(mgr.bankedProfit >= 0 ? '+' : '') + fmtM(mgr.bankedProfit)}
+            </span>
+          </div>
+        )}
         <div className="pitch-total">
-          <span className="lbl">{mgr.name} — Net {state.finalProfit ? '(incl. transfer profit)' : ''}</span>
+          <span className="lbl">{mgr.name} — Net{state.finalBanked ? ' (incl. transfer profit)' : ''}{mgrDone ? ` · Return ${fmtPct(roiOf(mgr))}` : ''}</span>
           <span className="amt mono-num" style={{ color: tween < 0 ? 'var(--bad)' : 'var(--acc)' }}>{fmtM(tween)}</span>
         </div>
       </div>
       <AdvanceHint>
-        {state.finalIdx < PITCH_ORDER.length - 1 ? 'reveal next position'
-          : !state.finalProfit ? 'reveal each player’s profit / loss'
+        {state.finalIdx === -1 ? 'reveal the first player'
+          : state.finalStage === 0 ? 'reveal their profit / loss'
+          : state.finalIdx < lastPos ? 'reveal the next player'
+          : !mgrDone ? 'add transfer window profit'
           : state.finalMgr < state.managers.length - 1 ? `reveal ${state.managers[state.finalMgr + 1].name}’s squad`
           : 'see final standings'}
       </AdvanceHint>
@@ -1314,8 +1360,9 @@ function Confetti() {
 }
 
 function StandingsScreen({ state, dispatch }) {
-  const ranked = [...state.managers].map(m => ({ m, score: scoreOf(m), sq: squadValue(m) }))
-                    .sort((a, b) => b.score - a.score);
+  // Ranked by return on investment (net profit ÷ total spent); € net breaks ties.
+  const ranked = [...state.managers].map(m => ({ m, score: scoreOf(m), roi: roiOf(m), sq: squadValue(m) }))
+                    .sort((a, b) => b.roi - a.roi || b.score - a.score);
   const allRevealed = state.standRevealed >= state.managers.length;
   const advance = () => dispatch({ type: 'STAND_NEXT' });
   useKey(' ', () => { if (!allRevealed) advance(); });
@@ -1331,7 +1378,7 @@ function StandingsScreen({ state, dispatch }) {
         {allRevealed && (
           <div className="win-banner rise" style={{ marginBottom: 24 }}>
             <div className="display">{ranked[0].m.name} Wins</div>
-            <div className="h2" style={{ fontSize: 36, color:'var(--text-dim)' }}>Net {fmtM(ranked[0].score)}</div>
+            <div className="h2" style={{ fontSize: 36, color:'var(--text-dim)' }}>Return {fmtPct(ranked[0].roi)} · Net {fmtM(ranked[0].score)}</div>
           </div>
         )}
         {allRevealed && (
@@ -1342,14 +1389,14 @@ function StandingsScreen({ state, dispatch }) {
                 <div className="pod-block">
                   <div className="pod-rank">{rankOf(r)}</div>
                   <div className="pod-name">{r.m.name}</div>
-                  <div className="pod-score">{fmtM(r.score)}</div>
+                  <div className="pod-score">{fmtPct(r.roi)}</div>
                 </div>
               </div>
             ))}
           </div>
         )}
         <table className="standings-table">
-          <thead><tr><th>#</th><th>Manager</th><th>Squad Value</th><th>Sales Profit</th><th>Total</th></tr></thead>
+          <thead><tr><th>#</th><th>Manager</th><th>Spent</th><th>Squad Value</th><th>Net Profit</th><th>Return</th></tr></thead>
           <tbody>
             {ranked.map((r, i) => {
               // Reveal bottom-up (worst → winner) for tension.
@@ -1359,10 +1406,13 @@ function StandingsScreen({ state, dispatch }) {
                 <tr key={r.m.id} className={(allRevealed && i === 0 ? 'win' : '') + (show ? ' revealed' : '')}>
                   <td className="num">{i + 1}</td>
                   <td>{r.m.name}</td>
+                  <td className="num">{fmtM(r.m.totalSpent)}</td>
                   <td className="num">{fmtM(r.sq)}</td>
-                  <td className="num">{fmtM(r.m.bankedProfit)}</td>
-                  <td className={'num' + (drumroll ? ' drumroll' : '')} style={{ color: show ? (r.score>=0?'var(--acc)':'var(--bad)') : 'var(--text-faint)', fontWeight:800 }}>
+                  <td className="num" style={{ color: show ? (r.score>=0?'var(--good)':'var(--bad)') : 'var(--text-faint)' }}>
                     {show ? <Money value={r.score} run={true} ms={700} /> : '€??M'}
+                  </td>
+                  <td className={'num' + (drumroll ? ' drumroll' : '')} style={{ color: show ? (r.roi>=0?'var(--acc)':'var(--bad)') : 'var(--text-faint)', fontWeight:800 }}>
+                    {show ? fmtPct(r.roi) : '??%'}
                   </td>
                 </tr>
               );

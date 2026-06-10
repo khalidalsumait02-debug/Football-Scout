@@ -10,11 +10,16 @@ Open `app/index.html` in a browser connected to a TV. One person hosts, everyone
 - Each season, 5 anonymous player cards appear on screen
 - Stats + market value only — identity completely hidden
 - Each manager picks one card (host taps their choice)
+- The starting picker rotates every season, so first pick is shared fairly
 - Two transfer windows let you sell for profit and replace from the leftover shelf
-- Final reveal unmasks every player and calculates who invested best
+- Final reveal unmasks each player, then their profit, one beat at a time
 
 ### Scoring
-`Final score = current squad value − total spend + banked transfer profits`
+`Net profit = current squad value − total spend + banked transfer profits`
+
+Managers are ranked by **return on investment** — net profit divided by total
+money spent — so a cheap squad of gems competes fairly with a superstar squad.
+€ net profit breaks ties.
 
 ## Season timeline
 

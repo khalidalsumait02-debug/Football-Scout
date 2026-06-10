@@ -16,6 +16,8 @@ Inspired by: F3/eToro YouTube video "We BLINDLY Invested in Footballers Using On
 ### Core loop (9 seasons, 2016/17–2024/25)
 Each draft season: 5 anonymous player cards shown. Stats + market value only — no names, no photos. Each manager picks 1 card. Two left on the shelf (available as transfer window replacements for that position).
 
+**Pick order fairness:** the starting manager rotates each season on a fixed cycle (season step mod manager count) for both drafts and transfer windows, so first pick is shared equally.
+
 ### Season order
 | Season | Event | Position | Stats shown |
 |--------|-------|----------|-------------|
@@ -51,17 +53,19 @@ The user explicitly explained: "note how i sent some images in parts to show how
 6. Replacement's identity revealed
 7. **PROFIT / MADE: €XM** displayed big
 
-**Final reveal sequence (one click per player):**
+**Final reveal sequence (two clicks per player, one manager at a time):**
 - Formation pitch shown with all 7 positions as circles, values hidden
 - Players revealed back-to-front (GK first, strikers last)
-- Running TOTAL ticks up/down with each reveal (can go negative then positive)
-- Individual player name appears as each slot is clicked
-- Final TOTAL = current squad value − total amount spent = net gain/loss
+- Per player, two beats: click 1 = identity + current value; click 2 = that player's profit/loss
+- Running TOTAL ticks up/down as each profit beat lands (can go negative then positive)
+- After all 7 players: a final beat adds the manager's banked transfer profit (skipped if zero)
 
 ### Scoring
-`Final score = current squad value (all 7 players) − total amount spent + banked transfer profits`
+`Net profit = current squad value (all 7 players) − total amount spent + banked transfer profits`
 
-The "total" shown on the final pitch screen IS this net. Individual players can show negative contributions (e.g. a declined CB showing −€16M).
+**Ranking metric: return on investment** = net profit ÷ total money spent. ROI normalises for capital so cheap-gem squads compete fairly with superstar squads; € net profit breaks ties. The standings show Spent, Squad Value, Net Profit (€), and Return (%) — Return decides the winner.
+
+Individual players can show negative contributions (e.g. a declined CB showing −€16M).
 
 ### Host device model
 One person (the host) runs the app on a TV-connected device. Other managers give picks verbally. Host enters decisions for everyone. No networking required.
