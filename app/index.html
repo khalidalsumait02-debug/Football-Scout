@@ -224,13 +224,16 @@ input { font-family: inherit; }
 .pitch-slot.empty .slot-circle { border-style: dashed; background: rgba(0,0,0,0.18); color: rgba(255,255,255,0.6); }
 .pitch-slot.filled .slot-circle { background: var(--acc); color: #0d1117; border-color: var(--acc); box-shadow: 0 0 0 6px var(--acc-glow); }
 .pitch-slot.sell .slot-circle { background: var(--bad); color: #fff; border-color: var(--bad); box-shadow: 0 0 0 6px rgba(239,68,68,0.3); }
+.pitch-slot.just .slot-circle { animation: slot-pop .45s cubic-bezier(.3,1.3,.4,1) both; }
+.pitch-slot.next-up .slot-circle { animation: pulse-ring 1.2s infinite; border-color: var(--acc); }
+.pitch.enter .pitch-slot { animation: rise .4s ease both; animation-delay: calc(var(--d, 0) * 70ms); }
 .pitch-slot.locked { opacity: 0.45; }
 .pitch-slot.locked .slot-circle { box-shadow: none; filter: grayscale(0.5); }
 .lock-badge { position: absolute; right: -4px; bottom: -4px; font-size: 22px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.6)); }
 .slot-silh { width: 54px; height: 54px; }
 .slot-pos { font-family: var(--font-d); font-weight: 700; font-size: 16px; color: #fff; background: rgba(0,0,0,0.35); padding: 1px 8px; border-radius: 6px; }
 .slot-val { font-family: var(--font-d); font-weight: 700; font-size: 22px; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.5); }
-.slot-name { font-family: var(--font-d); font-weight: 700; font-size: 18px; color: #fff; text-align: center; max-width: 110px; animation: rise .4s ease both; }
+.slot-name { font-family: var(--font-d); font-weight: 700; font-size: 18px; color: #fff; text-align: center; max-width: 110px; animation: id-flip .5s ease .15s both; }
 .slot-year { font-size: 13px; color: rgba(255,255,255,0.6); }
 .pitch-total { display: flex; justify-content: space-between; align-items: center; padding: 18px 28px; background: var(--surface); border-radius: 14px; margin-top: 14px; }
 .pitch-total .lbl { font-family: var(--font-d); font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); font-size: 20px; }
@@ -290,6 +293,7 @@ input { font-family: inherit; }
 @keyframes id-flip { from { transform: rotateY(90deg); opacity: 0; } to { transform: rotateY(0); opacity: 1; } }
 @keyframes pop-in { 0% { transform: scale(.5); opacity: 0; } 70% { transform: scale(1.12); } 100% { transform: scale(1); opacity: 1; } }
 @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 var(--acc-glow); } 70% { box-shadow: 0 0 0 12px rgba(200,255,0,0); } 100% { box-shadow: 0 0 0 0 rgba(200,255,0,0); } }
+@keyframes slot-pop { 0% { transform: scale(.3); } 70% { transform: scale(1.18); box-shadow: 0 0 0 14px var(--acc-glow); } 100% { transform: scale(1); } }
 </style>
 </head>
 <body>
@@ -908,7 +912,7 @@ function PitchFormation({ mgr, mode, state, dispatch }) {
 
   return (
     <div className="pitch-wrap">
-      <div className="pitch">
+      <div className={'pitch' + (mode === 'view' ? ' enter' : '')}>
         {cols.map((col, ci) => (
           <div key={ci} className="pitch-col">
             {col.map(slot => {
@@ -925,7 +929,7 @@ function PitchFormation({ mgr, mode, state, dispatch }) {
               if (sellable) cls += ' clickable';
               if (locked) cls += ' locked';
               return (
-                <div key={slot.posKey} className={cls}
+                <div key={slot.posKey} className={cls} style={{ '--d': ci }}
                      onClick={() => sellable && dispatch({ type: 'WINDOW_TOGGLE', playerId: slot.player.id })}>
                   <div className="slot-circle">
                     {slot.player ? <Silhouette className="slot-silh" /> : POS_LABEL[slot.posKey]}
@@ -1146,13 +1150,16 @@ function FinalRevealScreen({ state, dispatch }) {
             <div key={ci} className="pitch-col">
               {col.map(slot => {
                 const revealed = finalPosRevealed(state, slot.posKey);
+                const just = slot.posKey === PITCH_ORDER[state.finalIdx];
+                const nextUp = !state.finalProfit && slot.posKey === PITCH_ORDER[state.finalIdx + 1];
                 const p = slot.player;
                 // Part 2 (profit pass): each slot shows its gain/loss vs what was paid.
                 // Replacements were bought at current market value, so they net €0.
                 const net = p ? p.curVal - (mgr.locked[slot.posKey] ? p.sellVal : p.buyVal) : 0;
                 return (
-                  <div key={slot.posKey} className={'pitch-slot ' + (p ? (revealed?'filled':'empty') : 'empty')}>
-                    <div className="slot-circle">
+                  <div key={slot.posKey}
+                       className={'pitch-slot ' + (p ? (revealed?'filled':'empty') : 'empty') + (just ? ' just' : '') + (nextUp ? ' next-up' : '')}>
+                    <div className="slot-circle" key={revealed ? 'on' : 'off'}>
                       {p && revealed ? <Silhouette className="slot-silh" /> : POS_LABEL[slot.posKey]}
                     </div>
                     <span className="slot-pos">{POS_LABEL[slot.posKey]}</span>
@@ -1161,7 +1168,7 @@ function FinalRevealScreen({ state, dispatch }) {
                           ? <>
                               <span className="slot-name">{p.name}</span>
                               {state.finalProfit
-                                ? <span className="slot-val" style={{ color: net >= 0 ? 'var(--good)' : 'var(--bad)' }}>{net >= 0 ? '+' : ''}{fmtM(net)}</span>
+                                ? <span className="slot-val" style={{ color: net >= 0 ? 'var(--good)' : 'var(--bad)' }}>{net >= 0 ? '+' : ''}<Money value={net} run={true} ms={600} /></span>
                                 : <span className="slot-val">{fmtM(p.curVal)}</span>}
                             </>
                           : <span className="slot-val">€?M</span>)
