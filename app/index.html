@@ -447,6 +447,7 @@ const initial = {
   sold: [],           // [{ mgrId, pos, player, replacementId|null }]
   revealIdx: 0,       // window reveal: which sold player
   revealStage: 0,     // window reveal: 0..6
+  finalMgr: 0,        // final reveal: which manager is being revealed (one at a time)
   finalIdx: -1,       // final reveal: index into PITCH_ORDER (per-position aggregated)
   finalProfit: false, // whether banked profits added on final screen
   standRevealed: 0,   // standings rows revealed
@@ -511,7 +512,7 @@ function reducer(state, action) {
     case 'SQUAD_DONE': {
       const next = SEASON_SEQUENCE[state.seasonStep + 1];
       if (!next || next.type === 'reveal')
-        return { ...state, seasonStep: state.seasonStep + 1, state: 'FINAL_REVEAL', finalIdx: -1 };
+        return { ...state, seasonStep: state.seasonStep + 1, state: 'FINAL_REVEAL', finalMgr: 0, finalIdx: -1, finalProfit: false };
       return { ...state, seasonStep: state.seasonStep + 1, state: 'ANNOUNCE' };
     }
 
@@ -566,8 +567,12 @@ function reducer(state, action) {
     }
 
     case 'FINAL_NEXT': {
+      // Reveal one manager fully (positions back-to-front, then the profit pass)
+      // before moving on to the next manager — one team at a time.
       if (state.finalIdx < PITCH_ORDER.length - 1) return { ...state, finalIdx: state.finalIdx + 1 };
       if (!state.finalProfit) return { ...state, finalProfit: true };
+      if (state.finalMgr < state.managers.length - 1)
+        return { ...state, finalMgr: state.finalMgr + 1, finalIdx: -1, finalProfit: false };
       return { ...state, state: 'STANDINGS', standRevealed: 0 };
     }
 
@@ -906,10 +911,12 @@ function PitchFormation({ mgr, mode, state, dispatch }) {
 }
 
 function SquadScreen({ state, dispatch }) {
-  // Show all managers' squads? For simplicity show each manager; but TV: show one at a time via tabs.
-  const [tab, setTab] = useState(0);
-  const mgr = state.managers[tab];
-  const advance = () => dispatch({ type: 'SQUAD_DONE' });
+  // Walk through each manager's squad one at a time (no tab switcher) — Continue
+  // moves to the next manager, then on to the next season once everyone is shown.
+  const [idx, setIdx] = useState(0);
+  const mgr = state.managers[idx];
+  const last = idx >= state.managers.length - 1;
+  const advance = () => { if (last) dispatch({ type: 'SQUAD_DONE' }); else setIdx(idx + 1); };
   useKey(' ', advance); useKey('Enter', advance);
 
   return (
@@ -919,15 +926,13 @@ function SquadScreen({ state, dispatch }) {
           <div className="h1">Squad — {mgr.name}</div>
           <div className="sub">{curSeason(state).yr} · paid for this squad</div>
         </div>
-        <div style={{ display:'flex', gap:8 }}>
-          {state.managers.map((m, i) => (
-            <button key={m.id} className={'btn ' + (i===tab?'btn-primary':'btn-ghost')} style={{fontSize:18,padding:'10px 18px'}} onClick={() => setTab(i)}>{m.name}</button>
-          ))}
-        </div>
+        <div className="sub" style={{ alignSelf:'center' }}>Team {idx + 1} of {state.managers.length}</div>
       </div>
       <PitchFormation mgr={mgr} mode="view" state={state} dispatch={dispatch} />
       <div className="cta-row">
-        <button className="btn btn-primary btn-lg" onClick={advance}>Continue →</button>
+        <button className="btn btn-primary btn-lg" onClick={advance}>
+          {last ? 'Continue →' : `Next: ${state.managers[idx + 1].name} →`}
+        </button>
       </div>
     </div>
   );
@@ -1023,6 +1028,10 @@ function ReplacePickScreen({ state, dispatch }) {
   const pos = item.pos;
   const shelf = state.shelf[pos] || [];
   const [picking, setPicking] = useState(null);
+  // Lay cards out in columns like the draft board so each card has full height
+  // and its four stat rows are visible (a single full-width column clips them).
+  const cols = shelf.length <= 6 ? Math.max(1, shelf.length) : Math.ceil(shelf.length / 2);
+  const compact = shelf.length > 6;
 
   return (
     <div className="scene">
@@ -1030,7 +1039,7 @@ function ReplacePickScreen({ state, dispatch }) {
         <div className="h1">Replace your {POS_LABEL[pos]}</div>
         <div className="sub"><span style={{color:'var(--acc)',fontWeight:700}}>{mgr.name}</span> — pick a replacement. Stats only, no names. Identity stays hidden until the final reveal.</div>
       </div>
-      <div className="draft-cards">
+      <div className={'draft-cards' + (compact ? ' compact' : '')} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
         {shelf.map((p, i) => (
           <div key={p.id} className="draft-card" onClick={() => setPicking(i)}>
             <div className="dc-top"><PosBadge pos={pos} /><div className="dc-num">{i + 1}</div></div>
@@ -1061,9 +1070,9 @@ function finalPosRevealed(state, posKey) {
   return idx <= state.finalIdx;
 }
 function FinalRevealScreen({ state, dispatch }) {
-  // Final reveal shown per manager via tabs; running total per manager.
-  const [tab, setTab] = useState(0);
-  const mgr = state.managers[tab];
+  // Final reveal goes one team at a time (no tab switcher): the current manager is
+  // revealed fully, then a click moves on to the next manager.
+  const mgr = state.managers[state.finalMgr];
   const advance = () => dispatch({ type: 'FINAL_NEXT' });
   useKey(' ', advance); useKey('Enter', advance);
 
@@ -1086,11 +1095,7 @@ function FinalRevealScreen({ state, dispatch }) {
           <div className="h1">Final Reveal</div>
           <div className="sub">Revealing back to front. Who did {mgr.name} actually buy?</div>
         </div>
-        <div style={{ display:'flex', gap:8 }} onClick={e=>e.stopPropagation()}>
-          {state.managers.map((m, i) => (
-            <button key={m.id} className={'btn ' + (i===tab?'btn-primary':'btn-ghost')} style={{fontSize:18,padding:'10px 18px'}} onClick={() => setTab(i)}>{m.name}</button>
-          ))}
-        </div>
+        <div className="sub" style={{ alignSelf:'center' }}>Team {state.finalMgr + 1} of {state.managers.length}</div>
       </div>
       <div className="pitch-wrap">
         <div className="pitch">
@@ -1132,6 +1137,7 @@ function FinalRevealScreen({ state, dispatch }) {
       <div className="hint">
         {state.finalIdx < PITCH_ORDER.length - 1 ? 'Click to reveal next position →'
           : !state.finalProfit ? 'Click to reveal each player’s profit / loss →'
+          : state.finalMgr < state.managers.length - 1 ? `Click to reveal ${state.managers[state.finalMgr + 1].name}’s squad →`
           : 'Click to see final standings →'}
       </div>
     </div>
