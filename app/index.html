@@ -791,15 +791,16 @@ function DraftScreen({ state, dispatch }) {
 
   const intent = (i) => { if (!pickedThisRound.includes(pool[i].id) && state.outIdx == null) dispatch({ type: 'PICK_INTENT', cardIdx: i }); };
   // keyboard 1-9
+  const intentRef = useRef();
+  intentRef.current = (n) => { if (state.picking == null && n <= pool.length) intent(n - 1); };
   useEffect(() => {
     const h = (e) => {
-      if (state.picking != null) return;
       const n = parseInt(e.key);
-      if (n >= 1 && n <= 9 && n <= pool.length) intent(n - 1);
+      if (n >= 1 && n <= 9) intentRef.current(n);
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  });
+  }, []);
 
   return (
     <div className="scene">
@@ -1212,11 +1213,13 @@ function StandingsScreen({ state, dispatch }) {
    ========================================================================= */
 
 function useKey(key, fn) {
+  const ref = useRef(fn);
+  ref.current = fn;
   useEffect(() => {
-    const h = (e) => { if (e.key === key) { e.preventDefault(); fn(); } };
+    const h = (e) => { if (e.key === key) { e.preventDefault(); ref.current(); } };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  });
+  }, [key]);
 }
 
 function App() {
