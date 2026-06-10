@@ -271,7 +271,11 @@ input { font-family: inherit; }
 .podium-row { display: flex; align-items: flex-end; justify-content: center; gap: 24px; margin-bottom: 40px; }
 .podium { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .podium .pod-av { width: 80px; height: 80px; font-size: 34px; }
-.podium .pod-block { background: var(--surface); border-radius: 14px 14px 0 0; width: 200px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 18px; border: 1px solid var(--line2); border-bottom: none; }
+.podium .pod-block { background: var(--surface); border-radius: 14px 14px 0 0; width: 200px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 18px; border: 1px solid var(--line2); border-bottom: none; transform-origin: bottom; animation: podium-rise .55s cubic-bezier(.2,1.1,.4,1) both; }
+.podium { animation: rise .5s ease both; }
+.podium.p3, .podium.p3 .pod-block { animation-delay: .1s; }
+.podium.p2, .podium.p2 .pod-block { animation-delay: .35s; }
+.podium.p1, .podium.p1 .pod-block { animation-delay: .65s; }
 .podium.p1 .pod-block { height: 220px; border-color: var(--acc); background: linear-gradient(180deg, var(--acc-glow), var(--surface)); }
 .podium.p2 .pod-block { height: 160px; }
 .podium.p3 .pod-block { height: 120px; }
@@ -283,8 +287,10 @@ input { font-family: inherit; }
 .standings-table td { padding: 16px 18px; border-bottom: 1px solid var(--line); font-size: 22px; }
 .standings-table .num { font-family: var(--font-d); font-weight: 700; font-variant-numeric: tabular-nums; }
 .standings-table tr.win td { background: var(--acc-glow); }
-.win-banner { text-align: center; }
+.win-banner { text-align: center; animation: pop-in .5s ease 1s both; }
 .win-banner .display { font-size: 110px; color: var(--acc); }
+.standings-table tr.revealed { animation: rise .4s ease both; }
+.drumroll { animation: drum-blink .9s ease-in-out infinite; }
 
 .hint { color: var(--text-faint); font-size: 16px; margin-top: 10px; text-align: center; }
 
@@ -306,6 +312,8 @@ input { font-family: inherit; }
 @keyframes slot-pop { 0% { transform: scale(.3); } 70% { transform: scale(1.18); box-shadow: 0 0 0 14px var(--acc-glow); } 100% { transform: scale(1); } }
 @keyframes flash-out { from { opacity: 1; } to { opacity: 0; } }
 @keyframes shake { 0%, 100% { transform: none; } 20% { transform: translateX(-9px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(3px); } }
+@keyframes podium-rise { from { transform: scaleY(0); opacity: 0; } }
+@keyframes drum-blink { 50% { opacity: .25; } }
 </style>
 </head>
 <body>
@@ -1207,6 +1215,51 @@ function FinalRevealScreen({ state, dispatch }) {
   );
 }
 
+// Winner celebration: pure-canvas confetti over the full 1920×1080 stage.
+// position:fixed resolves against the transformed #root, so it scales with the stage.
+function Confetti() {
+  const ref = useRef(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width = 1920, H = canvas.height = 1080;
+    const colors = ['#c8ff00', '#00d4b4', '#ffffff', '#ffd75e'];
+    const parts = [];
+    const spawn = () => parts.push({
+      x: Math.random() * W, y: -30 - Math.random() * 120,
+      vx: (Math.random() - .5) * 3, vy: 2 + Math.random() * 3.5,
+      w: 8 + Math.random() * 6, h: 5 + Math.random() * 5,
+      rot: Math.random() * Math.PI, vr: (Math.random() - .5) * .25,
+      color: colors[(Math.random() * colors.length) | 0],
+    });
+    for (let i = 0; i < 60; i++) spawn();
+    const start = performance.now();
+    let raf;
+    const tick = () => {
+      const elapsed = performance.now() - start;
+      if (elapsed < 2500 && parts.length < 160) spawn();
+      ctx.clearRect(0, 0, W, H);
+      for (let i = parts.length - 1; i >= 0; i--) {
+        const p = parts[i];
+        p.vy = Math.min(p.vy + 0.12, 7.5);
+        p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+        if (p.y > H + 40) { parts.splice(i, 1); continue; }
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        ctx.restore();
+      }
+      if (parts.length > 0 || elapsed < 2500) raf = requestAnimationFrame(tick);
+      else ctx.clearRect(0, 0, W, H);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  return <canvas ref={ref} style={{ position: 'fixed', left: 0, top: 0, width: 1920, height: 1080, pointerEvents: 'none', zIndex: 50 }} />;
+}
+
 function StandingsScreen({ state, dispatch }) {
   const ranked = [...state.managers].map(m => ({ m, score: scoreOf(m), sq: squadValue(m) }))
                     .sort((a, b) => b.score - a.score);
@@ -1220,6 +1273,7 @@ function StandingsScreen({ state, dispatch }) {
 
   return (
     <div className="scene scene-full" onClick={() => !allRevealed && advance()}>
+      {allRevealed && <Confetti />}
       <div style={{ width:'100%', maxWidth:1200 }} onClick={e => e.stopPropagation()}>
         {allRevealed && (
           <div className="win-banner rise" style={{ marginBottom: 24 }}>
@@ -1245,15 +1299,17 @@ function StandingsScreen({ state, dispatch }) {
           <thead><tr><th>#</th><th>Manager</th><th>Squad Value</th><th>Sales Profit</th><th>Total</th></tr></thead>
           <tbody>
             {ranked.map((r, i) => {
-              const show = i < state.standRevealed || allRevealed;
+              // Reveal bottom-up (worst → winner) for tension.
+              const show = i >= ranked.length - state.standRevealed || allRevealed;
+              const drumroll = !allRevealed && i === ranked.length - state.standRevealed - 1;
               return (
-                <tr key={r.m.id} className={allRevealed && i === 0 ? 'win' : ''}>
+                <tr key={r.m.id} className={(allRevealed && i === 0 ? 'win' : '') + (show ? ' revealed' : '')}>
                   <td className="num">{i + 1}</td>
                   <td>{r.m.name}</td>
                   <td className="num">{fmtM(r.sq)}</td>
                   <td className="num">{fmtM(r.m.bankedProfit)}</td>
-                  <td className="num" style={{ color: show ? (r.score>=0?'var(--acc)':'var(--bad)') : 'var(--text-faint)', fontWeight:800 }}>
-                    {show ? fmtM(r.score) : '€??M'}
+                  <td className={'num' + (drumroll ? ' drumroll' : '')} style={{ color: show ? (r.score>=0?'var(--acc)':'var(--bad)') : 'var(--text-faint)', fontWeight:800 }}>
+                    {show ? <Money value={r.score} run={true} ms={700} /> : '€??M'}
                   </td>
                 </tr>
               );
