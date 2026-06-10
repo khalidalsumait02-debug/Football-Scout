@@ -977,7 +977,7 @@ function WindowRevealScreen({ state, dispatch }) {
 
   return (
     <div className="scene scene-full" onClick={advance}>
-      <div className="reveal-stage" onClick={e => e.stopPropagation()}>
+      <div className="reveal-stage">
         <div className="kicker">{mgr.name} · {posLbl} · bought {SEASON_SEQUENCE.find(s=>s.pos===p.pos)?.yr}</div>
 
         {/* SOLD player identity card */}
