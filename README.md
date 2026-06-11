@@ -1,10 +1,16 @@
-# The Scout
+# Football Night
 
-A TV-optimized multiplayer football scouting game where managers blindly invest in real footballers across 9 seasons using only stats and market values — no names, no photos.
+A collection of TV-optimized multiplayer football party games. Open `app/index.html` in a browser connected to a TV and pick a game — one person hosts, everyone else plays along verbally.
 
-## How to play
+## The games
 
-Open `app/index.html` in a browser connected to a TV. One person hosts, everyone else gives picks verbally.
+### The Scout (`app/scout.html`)
+Managers blindly invest in real footballers across 9 seasons using only stats and market values — no names, no photos.
+
+### World Cup Trivia (`app/trivia.html`)
+A pass-and-play quiz on World Cup history — 51 questions from 1930 to 2022 across winners, records, legends, moments, hosts and awards. Each player answers on a 25-second clock; faster correct answers earn a speed bonus, difficulty ramps up round by round, and the leaderboard decides the champion.
+
+## The Scout — how to play
 
 ### The loop
 - Each season, 5 anonymous player cards appear on screen
@@ -34,7 +40,9 @@ Open `app/index.html` in a browser connected to a TV. One person hosts, everyone
 ## Files
 
 ```
-app/index.html    — the game (single file, no install needed)
+app/index.html    — home page: pick a game (single file, no install needed)
+app/scout.html    — The Scout
+app/trivia.html   — World Cup Trivia
 data/             — raw FBref player data used to build draft pools
 CLAUDE.md         — full project context for AI sessions
 ```

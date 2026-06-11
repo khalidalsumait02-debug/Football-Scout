@@ -1,17 +1,18 @@
-# The Scout — Project Context
+# Football Night — Project Context
 
 ## What this is
-A single-file TV-optimized multiplayer football scouting game. Managers "invest" in real footballers blindly across 9 seasons, seeing only stats and market values — never names. At the final reveal, identities unmask and net profit decides the winner.
-
-Inspired by: F3/eToro YouTube video "We BLINDLY Invested in Footballers Using Only Their Stats."
+A collection of single-file TV-optimized multiplayer football party games:
+- **Home page** (`app/index.html`) — game selector linking to the games below (plain HTML/CSS/JS, no React)
+- **The Scout** (`app/scout.html`) — managers "invest" in real footballers blindly across 9 seasons, seeing only stats and market values — never names. At the final reveal, identities unmask and net profit decides the winner. Inspired by: F3/eToro YouTube video "We BLINDLY Invested in Footballers Using Only Their Stats."
+- **World Cup Trivia** (`app/trivia.html`) — pass-and-play quiz with 51 inlined World Cup history questions (1930–2022). 25-second clock with speed bonus, difficulty ramps per round (easy → medium → hard, same difficulty for every player in a round), staggered answer reveal (lock in → suspense beat → verdict slam → fun fact), leaderboard finish. 1–6 players, 3/5/7 questions each.
 
 ## Output format
-**Single HTML file** (`app/index.html`) — no build step, opens by double-click. React 18 + Babel via CDN, all data inlined.
+**Single HTML file per page** — no build step, opens by double-click. React 18 + Babel via CDN, all data inlined. Pages link to each other with plain relative `href`s.
 
 ## Target screen
 **TV / 16:9 landscape** — not a phone. Design for ~1920×1080 or 1280×720. Text readable from 3 metres.
 
-## Game rules (authoritative)
+## The Scout — game rules (authoritative)
 
 ### Core loop (9 seasons, 2016/17–2024/25)
 Each draft season: 5 anonymous player cards shown. Stats + market value only — no names, no photos. Each manager picks 1 card. Two left on the shelf (available as transfer window replacements for that position).
@@ -64,7 +65,7 @@ The user explicitly explained: "note how i sent some images in parts to show how
 The "total" shown on the final pitch screen IS this net. Individual players can show negative contributions (e.g. a declined CB showing −€16M).
 
 ### Host device model
-One person (the host) runs the app on a TV-connected device. Other managers give picks verbally. Host enters decisions for everyone. No networking required.
+One person (the host) runs the app on a TV-connected device. Other managers give picks verbally. Host enters decisions for everyone. No networking required. (Same model applies to World Cup Trivia.)
 
 ## Stats system
 **Real football stats only** — NOT FIFA game attributes (not PAC/SHO/PAS/DRI/DEF/PHY).
@@ -133,7 +134,7 @@ The zip contains a Claude-generated design prototype. It is **visual reference o
   - Dossier slide-up overlay pattern (proto-screens-1.jsx)
 
 ## Branch
-All development on: `claude/vigilant-mayer-cmxv6g`
+Development happens on the session's designated `claude/*` branch (see session instructions).
 
 ## What NOT to do
 - Don't use the prototype for rules or stats — it has many errors
