@@ -3,17 +3,13 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>The Scout</title>
+<title>Football Night — Pick a Game</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin></script>
-<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
-<script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js"></script>
 <style>
 :root {
   --bg:        #0d1117;
-  --bg2:       #111a2e;
   --surface:   #1a2340;
   --surface2:  #1f2b4a;
   --line:      rgba(255,255,255,0.08);
@@ -22,15 +18,10 @@
   --text-dim:  rgba(255,255,255,0.58);
   --text-faint:rgba(255,255,255,0.32);
   --acc:       #c8ff00;
-  --acc-dark:  #9fc900;
   --acc-glow:  rgba(200,255,0,0.20);
   --teal:      #00d4b4;
-  --good:      #22c55e;
-  --bad:       #ef4444;
   --font-d: 'Barlow Condensed', 'Arial Narrow', sans-serif;
   --font-u: 'Inter', system-ui, sans-serif;
-  --sidebar-w: 300px;
-  --r: 16px;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -42,1424 +33,162 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Fixed 1920×1080 stage, scaled by App to fit the window (letterboxed) */
-#root {
-  width: 1920px; height: 1080px; display: flex;
+/* Fixed 1920×1080 stage, scaled to fit the window (letterboxed on non-16:9) */
+#stage {
+  width: 1920px; height: 1080px;
   position: absolute; left: 50%; top: 50%;
   transform: translate(-50%, -50%);
   background: var(--bg); overflow: hidden;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
 }
 
-button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
-input { font-family: inherit; }
+.bg-blob { position: absolute; border-radius: 50%; filter: blur(120px); pointer-events: none; animation: drift 22s ease-in-out infinite alternate; }
+.bg-blob.a { width: 900px; height: 700px; left: -250px; top: -260px; background: rgba(200,255,0,0.06); }
+.bg-blob.b { width: 900px; height: 700px; right: -250px; bottom: -260px; background: rgba(0,212,180,0.07); animation-delay: -11s; }
+@keyframes drift { from { transform: translate(0,0) scale(1); } to { transform: translate(90px,50px) scale(1.15); } }
 
-/* ---------- Typography helpers ---------- */
-.display   { font-family: var(--font-d); font-weight: 800; line-height: 0.88; text-transform: uppercase; letter-spacing: -1px; }
-.h1        { font-family: var(--font-d); font-weight: 700; line-height: 1.0; text-transform: uppercase; }
-.h2        { font-family: var(--font-d); font-weight: 700; }
-.kicker    { font-family: var(--font-d); font-weight: 600; letter-spacing: 3px; text-transform: uppercase; color: var(--text-dim); font-size: 20px; }
-.mono-num  { font-family: var(--font-d); font-weight: 700; font-variant-numeric: tabular-nums; }
+.kicker {
+  font-family: var(--font-d); font-weight: 600; letter-spacing: 6px;
+  text-transform: uppercase; color: var(--teal); font-size: 24px;
+  animation: rise .6s ease both;
+}
+.title {
+  font-family: var(--font-d); font-weight: 800; font-size: 120px;
+  line-height: 0.9; text-transform: uppercase; letter-spacing: -1px;
+  margin: 14px 0 10px; text-align: center;
+  animation: rise .6s ease both .08s;
+}
+.title .dot { color: var(--acc); }
+.subtitle { color: var(--text-dim); font-size: 26px; animation: rise .6s ease both .16s; }
 
-/* ---------- Sidebar ---------- */
-.sidebar {
-  width: var(--sidebar-w); flex-shrink: 0;
+.games { display: flex; gap: 48px; margin-top: 70px; }
+
+.game-card {
+  width: 560px; text-align: left; text-decoration: none; color: var(--text);
   background: linear-gradient(180deg, var(--surface) 0%, #151d36 100%);
-  border-right: 1px solid var(--line);
-  display: flex; flex-direction: column; padding: 30px 24px; gap: 26px;
+  border: 2px solid var(--line); border-radius: 24px;
+  padding: 44px 44px 38px; position: relative; display: flex; flex-direction: column;
+  transition: transform .18s ease, box-shadow .25s, border-color .2s;
+  animation: rise .6s ease both;
 }
-.sidebar.hidden { display: none; }
-.side-brand { font-family: var(--font-d); font-weight: 800; font-size: 34px; text-transform: uppercase; letter-spacing: 1px; }
-.side-brand .dot { color: var(--acc); }
-
-.rail { display: flex; flex-direction: column; gap: 2px; }
-.rail-title { font-size: 13px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-faint); margin-bottom: 10px; font-weight: 700; }
-.rail-step { display: flex; align-items: center; gap: 12px; padding: 6px 0; opacity: 0.5; transition: opacity .3s; }
-.rail-step.active { opacity: 1; }
-.rail-step.done { opacity: 0.75; }
-.rail-bullet { width: 12px; height: 12px; border-radius: 50%; background: var(--text-faint); flex-shrink: 0; }
-.rail-step.active .rail-bullet { background: var(--acc); box-shadow: 0 0 0 5px var(--acc-glow); }
-.rail-step.done .rail-bullet { background: var(--teal); }
-.rail-yr { font-family: var(--font-d); font-weight: 600; font-size: 19px; }
-.rail-pos { margin-left: auto; font-size: 13px; color: var(--text-dim); font-weight: 600; }
-
-.mgr-list { display: flex; flex-direction: column; gap: 10px; margin-top: auto; }
-.mgr-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px solid transparent; transition: all .25s; }
-.mgr-row.current { background: var(--acc-glow); border-color: var(--acc); }
-.avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--surface2); color: var(--text); display: flex; align-items: center; justify-content: center; font-family: var(--font-d); font-weight: 700; font-size: 20px; flex-shrink: 0; }
-.mgr-row.current .avatar { background: var(--acc); color: #0d1117; animation: pulse-ring 1.6s infinite; }
-.mgr-meta { display: flex; flex-direction: column; line-height: 1.1; min-width: 0; }
-.mgr-name { font-weight: 600; font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mgr-sub { font-size: 13px; color: var(--text-dim); }
-
-/* ---------- Main ---------- */
-.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
-.main::before { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
-  background:
-    radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.45)),
-    radial-gradient(900px 600px at 15% -10%, rgba(200,255,0,.04), transparent 70%),
-    radial-gradient(900px 600px at 90% 110%, rgba(0,212,180,.04), transparent 70%);
+.game-card:nth-child(2) { animation-delay: .12s; }
+.game-card:hover, .game-card.focused {
+  transform: translateY(-10px);
+  border-color: var(--acc);
+  box-shadow: 0 26px 70px rgba(0,0,0,0.55), 0 0 0 6px var(--acc-glow);
 }
-.scene-shell { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-.scene-shell.out { pointer-events: none; }
-.scene-shell.out .scene { animation: scene-out .26s ease both; }
-.scene { flex: 1; display: flex; flex-direction: column; padding: 40px 48px; animation: scene-in .4s ease both; min-height: 0; position: relative; z-index: 1; }
-.scene-full { padding: 0; align-items: center; justify-content: center; }
+.game-card:active { transform: translateY(-4px) scale(.99); }
 
-.scene-head { margin-bottom: 24px; }
-.scene-head .h1 { font-size: 56px; }
-.scene-head .sub { color: var(--text-dim); font-size: 22px; margin-top: 4px; }
+.game-key {
+  position: absolute; top: 28px; right: 28px;
+  width: 52px; height: 52px; border-radius: 12px;
+  background: rgba(255,255,255,0.06); border: 1px solid var(--line2);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-d); font-weight: 700; font-size: 28px; color: var(--text-dim);
+  transition: all .2s;
+}
+.game-card:hover .game-key, .game-card.focused .game-key { background: var(--acc); color: #0d1117; border-color: var(--acc); }
 
-/* ---------- Buttons ---------- */
-.btn { font-family: var(--font-d); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border-radius: 12px; padding: 16px 32px; font-size: 24px; transition: transform .12s, box-shadow .2s, background .2s; }
-.btn:active { transform: scale(.97); }
-.btn-primary { background: var(--acc); color: #0d1117; position: relative; overflow: hidden; }
-.btn-primary::after { content: ''; position: absolute; top: 0; bottom: 0; left: -75%; width: 50%; background: linear-gradient(105deg, transparent, rgba(255,255,255,.35), transparent); transform: skewX(-20deg); transition: left .6s ease; pointer-events: none; }
-.btn-primary:hover { box-shadow: 0 8px 30px var(--acc-glow); transform: translateY(-2px); }
-.btn-primary:hover::after { left: 125%; }
-.btn-primary:active { transform: scale(.97); }
-.btn-ghost { background: rgba(255,255,255,0.06); color: var(--text); border: 1px solid var(--line2); }
-.btn-ghost:hover { background: rgba(255,255,255,0.12); }
-.btn-good { background: transparent; color: var(--good); border: 2px solid var(--good); }
-.btn-good:hover { background: rgba(34,197,94,0.12); }
-.btn-bad { background: transparent; color: var(--bad); border: 2px solid var(--bad); }
-.btn-bad:hover { background: rgba(239,68,68,0.12); }
-.btn-lg { font-size: 30px; padding: 22px 48px; }
-.btn:disabled { opacity: .4; cursor: not-allowed; }
+.game-emblem {
+  width: 92px; height: 92px; border-radius: 20px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 48px; margin-bottom: 26px;
+  background: rgba(255,255,255,0.05); border: 1px solid var(--line2);
+}
+.game-name { font-family: var(--font-d); font-weight: 800; font-size: 58px; line-height: 0.95; text-transform: uppercase; }
+.game-name em { font-style: normal; color: var(--acc); }
+.game-desc { color: var(--text-dim); font-size: 21px; line-height: 1.45; margin-top: 14px; }
 
-.cta-row { display: flex; gap: 16px; margin-top: auto; padding-top: 24px; justify-content: flex-end; }
+.game-meta { display: flex; gap: 10px; margin-top: auto; padding-top: 26px; flex-wrap: wrap; }
+.meta-pill {
+  background: rgba(255,255,255,0.05); border: 1px solid var(--line);
+  border-radius: 999px; padding: 7px 16px;
+  font-family: var(--font-d); font-weight: 600; font-size: 17px;
+  letter-spacing: 1px; text-transform: uppercase; color: var(--text-dim);
+}
+.meta-pill.hl { color: var(--teal); border-color: rgba(0,212,180,0.35); }
 
-/* ---------- Pos badge ---------- */
-.pos-badge { display: inline-flex; align-items: center; justify-content: center; background: var(--acc); color: #0d1117; font-family: var(--font-d); font-weight: 800; border-radius: 8px; padding: 2px 12px; font-size: 22px; letter-spacing: 1px; }
-.pos-badge.sm { font-size: 16px; padding: 1px 9px; border-radius: 6px; }
-.pos-badge.lg { font-size: 40px; padding: 6px 22px; border-radius: 12px; }
+.play-row {
+  margin-top: 28px; display: flex; align-items: center; gap: 12px;
+  font-family: var(--font-d); font-weight: 700; font-size: 24px;
+  letter-spacing: 2px; text-transform: uppercase; color: var(--acc);
+}
+.play-row .arrow { transition: transform .2s; }
+.game-card:hover .play-row .arrow, .game-card.focused .play-row .arrow { transform: translateX(8px); }
 
-/* ---------- Silhouette ---------- */
-.silh { position: relative; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #2c3a5e, #1a2340); overflow: hidden; flex-shrink: 0; }
-.silh::before { content: ''; position: absolute; left: 50%; top: 20%; width: 38%; height: 38%; border-radius: 50%; background: rgba(255,255,255,0.18); transform: translateX(-50%); }
-.silh::after { content: ''; position: absolute; left: 50%; bottom: -18%; width: 78%; height: 62%; border-radius: 50% 50% 0 0; background: rgba(255,255,255,0.18); transform: translateX(-50%); }
-
-/* ---------- Stat row ---------- */
-.stat-row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
-.stat-row:last-child { border-bottom: none; }
-.stat-lbl { color: var(--teal); font-weight: 600; font-size: 16px; letter-spacing: .3px; flex-shrink: 0; }
-.stat-val { font-family: var(--font-d); font-weight: 700; font-size: 30px; text-align: right; line-height: 1; white-space: nowrap; }
-.stat-val.text { font-size: 19px; font-weight: 600; white-space: normal; line-height: 1.15; }
-
-/* ---------- Setup ---------- */
-.setup-wrap { display: flex; gap: 80px; align-items: center; max-width: 1400px; width: 100%; }
-.setup-left { flex: 1; }
-.setup-left .display { font-size: 130px; }
-.setup-left .tagline { color: var(--text-dim); font-size: 26px; margin-top: 8px; }
-.timeline-strip { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 32px; max-width: 560px; }
-.tl-pill { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 8px 16px; font-family: var(--font-d); font-weight: 600; font-size: 17px; display: flex; gap: 8px; align-items: center; }
-.tl-pill .tl-pos { color: var(--acc); }
-.setup-right { width: 460px; background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 36px; }
-.setup-right h3 { font-family: var(--font-d); font-weight: 700; font-size: 28px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; }
-.mgr-input-row { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
-.mgr-input-row input { flex: 1; background: var(--bg); border: 1px solid var(--line2); border-radius: 12px; padding: 14px 16px; color: var(--text); font-size: 20px; font-weight: 500; }
-.mgr-input-row input:focus { outline: none; border-color: var(--acc); }
-.mgr-input-row .rm { width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.06); color: var(--text-dim); font-size: 20px; flex-shrink: 0; }
-.mgr-input-row .rm:hover { background: rgba(239,68,68,0.2); color: var(--bad); }
-.add-mgr { width: 100%; padding: 12px; border: 1px dashed var(--line2); border-radius: 12px; color: var(--text-dim); font-family: var(--font-d); font-weight: 600; font-size: 18px; text-transform: uppercase; letter-spacing: 1px; }
-.add-mgr:hover { border-color: var(--acc); color: var(--acc); }
-.add-mgr:disabled { opacity: .35; }
-
-/* ---------- Announce ---------- */
-.announce { text-align: center; max-width: 1100px; position: relative; z-index: 1; }
-.announce .season-no { color: var(--teal); font-family: var(--font-d); font-weight: 600; letter-spacing: 4px; font-size: 26px; text-transform: uppercase; }
-.announce .big-year { font-family: var(--font-d); font-weight: 800; font-size: 200px; color: var(--acc); line-height: 0.9; margin: 8px 0; animation: year-slam .55s cubic-bezier(.2,1.3,.4,1) both, year-glow .8s ease .45s both; }
-/* ambient announce background */
-.announce-bg { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
-.bg-blob { position: absolute; width: 900px; height: 900px; border-radius: 50%; filter: blur(90px); }
-.bg-blob.a { background: radial-gradient(circle, rgba(200,255,0,.07), transparent 65%); top: -220px; left: -160px; animation: bg-drift 18s ease-in-out infinite alternate; }
-.bg-blob.b { background: radial-gradient(circle, rgba(0,212,180,.07), transparent 65%); bottom: -260px; right: -160px; animation: bg-drift 26s ease-in-out infinite alternate-reverse; }
-.bg-pitch { position: absolute; left: 50%; top: 50%; width: 900px; height: 900px; margin: -450px 0 0 -450px; border: 2px solid rgba(255,255,255,.04); border-radius: 50%; animation: slow-spin 60s linear infinite; }
-.bg-pitch::before { content: ''; position: absolute; left: -300px; right: -300px; top: 50%; border-top: 2px solid rgba(255,255,255,.04); }
-.slam { display: inline-block; position: relative; animation: badge-slam .5s cubic-bezier(.3,1.2,.4,1) .35s both; }
-.slam::after { content: ''; position: absolute; inset: -8px; border-radius: 18px; animation: shockwave .7s ease-out .85s 1 both; }
-.announce .tagline { font-size: 30px; color: var(--text); margin-top: 18px; }
-.announce .stat-preview { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 30px; }
-.announce .sp-pill { background: var(--surface); border: 1px solid var(--line2); border-radius: 999px; padding: 12px 24px; font-family: var(--font-d); font-weight: 600; font-size: 22px; color: var(--teal); }
-.rise { animation: rise .5s ease both; }
-
-/* ---------- Draft ---------- */
-.draft-cards { display: grid; gap: 16px; flex: 1; min-height: 0; grid-auto-rows: 1fr; }
-.draft-card { background: var(--surface); border-radius: var(--r); border: 2px solid var(--line2); display: flex; flex-direction: column; padding: 22px 20px; cursor: pointer; transition: transform .15s, box-shadow .15s, border-color .15s; position: relative; overflow: hidden; animation: deal-in .45s cubic-bezier(.2,.9,.3,1.15) both; animation-delay: calc(min(var(--i, 0), 9) * 65ms); }
-/* value tiers */
-.draft-card.tier-gold   { border-color: rgba(255,215,94,.55); box-shadow: inset 0 0 24px rgba(255,215,94,.10), 0 0 18px rgba(255,215,94,.08); }
-.draft-card.tier-silver { border-color: rgba(174,191,214,.45); }
-.draft-card.tier-bronze { border-color: rgba(168,112,69,.5); }
-.draft-card.tier-gold .dc-val   { color: #ffd75e; }
-.draft-card.tier-silver .dc-val { color: #dbe6f5; }
-.draft-card.tier-bronze .dc-val { color: #e0a878; }
-/* compact mode for >6 cards (wraps into two rows) */
-.draft-cards.compact { gap: 10px; }
-.draft-cards.compact .draft-card { padding: 12px 14px; border-width: 1px; border-radius: 12px; }
-.draft-cards.compact .draft-card:hover:not(.drafted) { transform: translateY(-5px); }
-.draft-cards.compact .dc-val { font-size: 30px; margin: 0 0 6px; }
-.draft-cards.compact .dc-silh { width: 48px; height: 48px; margin: 0 auto 6px; }
-.draft-cards.compact .dc-num { width: 22px; height: 22px; font-size: 13px; }
-.draft-cards.compact .pos-badge { font-size: 15px; padding: 0 7px; }
-.draft-cards.compact .stat-row { padding: 4px 0; }
-.draft-cards.compact .stat-val { font-size: 21px; }
-.draft-cards.compact .stat-val.text { font-size: 14px; }
-.draft-cards.compact .stat-lbl { font-size: 12px; }
-.draft-card:hover:not(.drafted) { transform: translateY(-10px) perspective(1000px) rotateX(2.5deg); box-shadow: 0 24px 60px rgba(0,0,0,0.5); border-color: var(--acc); }
-.draft-card.drafted { opacity: .3; pointer-events: none; filter: grayscale(.7); }
-.draft-card.out { animation: drafted-out .55s cubic-bezier(.4,0,.7,.2) both; }
-.dc-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.dc-num { width: 30px; height: 30px; border-radius: 8px; background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-family: var(--font-d); font-weight: 700; font-size: 18px; color: var(--text-dim); }
-.dc-val { font-family: var(--font-d); font-weight: 800; font-size: 50px; text-align: center; margin: 2px 0 12px; }
-.dc-silh { width: 92px; height: 92px; margin: 0 auto 14px; }
-.dc-stats { margin-top: auto; }
-.drafted-stamp { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
-.drafted-stamp span { font-family: var(--font-d); font-weight: 800; font-size: 30px; color: var(--text); border: 3px solid var(--text); padding: 4px 16px; border-radius: 8px; transform: rotate(-12deg); letter-spacing: 2px; }
-
-.pick-confirm { position: absolute; inset: 0; background: rgba(13,17,23,0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 20px; text-align: center; z-index: 5; animation: scene-in .2s ease both; }
-.pick-confirm .pc-q { font-family: var(--font-d); font-weight: 700; font-size: 26px; }
-.pick-confirm .pc-mgr { color: var(--acc); }
-.pick-confirm .pc-btns { display: flex; flex-direction: column; gap: 10px; width: 100%; }
-
-/* ---------- Pitch ---------- */
-.pitch-wrap { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-.pitch { flex: 1; background: linear-gradient(180deg, #1a5c2a 0%, #134420 100%); border-radius: 20px; position: relative; padding: 30px 40px; display: flex; gap: 12px; overflow: hidden; min-height: 0; }
-.pitch::before { content: ''; position: absolute; inset: 16px; border: 2px solid rgba(255,255,255,0.25); border-radius: 12px; pointer-events: none; }
-.pitch::after { content: ''; position: absolute; left: 16px; right: 16px; top: 50%; height: 0; border-top: 2px solid rgba(255,255,255,0.18); pointer-events: none; }
-.pitch-col { flex: 1; display: flex; flex-direction: column; justify-content: space-around; align-items: center; gap: 10px; position: relative; z-index: 1; }
-.pitch-slot { display: flex; flex-direction: column; align-items: center; gap: 6px; transition: transform .3s; }
-.pitch-slot.clickable { cursor: pointer; }
-.pitch-slot.clickable:hover { transform: scale(1.06); }
-.slot-circle { width: 76px; height: 76px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--font-d); font-weight: 700; font-size: 22px; border: 2px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.12); color: #fff; position: relative; transition: all .3s; }
-.pitch-slot.empty .slot-circle { border-style: dashed; background: rgba(0,0,0,0.18); color: rgba(255,255,255,0.6); }
-.pitch-slot.filled .slot-circle { background: var(--acc); color: #0d1117; border-color: var(--acc); box-shadow: 0 0 0 6px var(--acc-glow); }
-.pitch-slot.sell .slot-circle { background: var(--bad); color: #fff; border-color: var(--bad); box-shadow: 0 0 0 6px rgba(239,68,68,0.3); }
-.pitch-slot.just .slot-circle { animation: slot-pop .45s cubic-bezier(.3,1.3,.4,1) both; }
-.pitch-slot.next-up .slot-circle { animation: pulse-ring 1.2s infinite; border-color: var(--acc); }
-.pitch.enter .pitch-slot { animation: rise .4s ease both; animation-delay: calc(var(--d, 0) * 70ms); }
-.pitch-slot.locked { opacity: 0.45; }
-.pitch-slot.locked .slot-circle { box-shadow: none; filter: grayscale(0.5); }
-.lock-badge { position: absolute; right: -4px; bottom: -4px; font-size: 22px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.6)); }
-.slot-silh { width: 54px; height: 54px; }
-.slot-pos { font-family: var(--font-d); font-weight: 700; font-size: 16px; color: #fff; background: rgba(0,0,0,0.35); padding: 1px 8px; border-radius: 6px; }
-.slot-val { font-family: var(--font-d); font-weight: 700; font-size: 22px; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.5); }
-.slot-name { font-family: var(--font-d); font-weight: 700; font-size: 18px; color: #fff; text-align: center; max-width: 110px; animation: id-flip .5s ease .15s both; }
-.slot-year { font-size: 13px; color: rgba(255,255,255,0.6); }
-.pitch-total { display: flex; justify-content: space-between; align-items: center; padding: 18px 28px; background: var(--surface); border-radius: 14px; margin-top: 14px; }
-.pitch-total .lbl { font-family: var(--font-d); font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); font-size: 20px; }
-.pitch-total .amt { font-family: var(--font-d); font-weight: 800; font-size: 48px; }
-
-/* ---------- Window reveal ---------- */
-.reveal-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; text-align: center; }
-.reveal-stage.shake { animation: shake .45s ease both; }
-.rv-card { background: var(--surface); border: 2px solid var(--line2); border-radius: 20px; padding: 40px 60px; min-width: 480px; display: flex; flex-direction: column; align-items: center; gap: 14px; transition: border-color .4s, box-shadow .4s; }
-.rv-card.revealed { border-color: var(--acc); box-shadow: 0 0 40px var(--acc-glow); }
-.rv-line.pop, .rv-card.pop { animation: pop-in .5s ease both; }
-.flash { position: absolute; inset: 0; pointer-events: none; z-index: 9; animation: flash-out .6s ease-out both; }
-.flash.good { background: radial-gradient(circle, rgba(34,197,94,.28), transparent 70%); }
-.flash.bad  { background: radial-gradient(circle, rgba(239,68,68,.30), transparent 70%); }
-.rv-profit-wrap { position: relative; text-align: center; }
-.rv-profit-wrap::before { content: ''; position: absolute; inset: -40px -90px; z-index: -1; border-radius: 50%; filter: blur(12px); animation: pop-in .5s ease both; }
-.rv-profit-wrap.good::before { background: radial-gradient(ellipse, rgba(34,197,94,.22), transparent 70%); }
-.rv-profit-wrap.bad::before  { background: radial-gradient(ellipse, rgba(239,68,68,.22), transparent 70%); }
-.rv-silh { width: 140px; height: 140px; }
-.rv-name { font-family: var(--font-d); font-weight: 800; font-size: 56px; text-transform: uppercase; animation: id-flip .5s ease both; }
-.rv-club { color: var(--text-dim); font-size: 22px; }
-.rv-line { display: flex; align-items: baseline; gap: 16px; font-family: var(--font-d); }
-.rv-line .l { color: var(--text-dim); font-weight: 600; font-size: 24px; }
-.rv-line .v { font-weight: 800; font-size: 56px; }
-.rv-profit { font-family: var(--font-d); font-weight: 800; font-size: 90px; animation: pop-in .5s ease both; }
-.rv-profit.good { color: var(--good); } .rv-profit.bad { color: var(--bad); }
-.rv-profit-lbl { font-family: var(--font-d); font-weight: 600; letter-spacing: 4px; text-transform: uppercase; color: var(--text-dim); font-size: 24px; }
-.shelf-row { display: flex; gap: 24px; justify-content: center; margin-top: 8px; }
-.shelf-card { background: var(--surface); border: 2px solid var(--line2); border-radius: 16px; padding: 24px; width: 220px; display: flex; flex-direction: column; align-items: center; gap: 10px; cursor: pointer; transition: all .15s; }
-.shelf-card:hover { border-color: var(--acc); transform: translateY(-6px); }
-.shelf-card.picked { border-color: var(--acc); background: var(--acc-glow); }
-.shelf-silh { width: 80px; height: 80px; }
-
-/* ---------- Standings ---------- */
-.podium-row { display: flex; align-items: flex-end; justify-content: center; gap: 24px; margin-bottom: 40px; }
-.podium { display: flex; flex-direction: column; align-items: center; gap: 12px; }
-.podium .pod-av { width: 80px; height: 80px; font-size: 34px; }
-.podium .pod-block { background: var(--surface); border-radius: 14px 14px 0 0; width: 200px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 18px; border: 1px solid var(--line2); border-bottom: none; transform-origin: bottom; animation: podium-rise .55s cubic-bezier(.2,1.1,.4,1) both; }
-.podium { animation: rise .5s ease both; }
-.podium.p3, .podium.p3 .pod-block { animation-delay: .1s; }
-.podium.p2, .podium.p2 .pod-block { animation-delay: .35s; }
-.podium.p1, .podium.p1 .pod-block { animation-delay: .65s; }
-.podium.p1 .pod-block { height: 220px; border-color: var(--acc); background: linear-gradient(180deg, var(--acc-glow), var(--surface)); }
-.podium.p2 .pod-block { height: 160px; }
-.podium.p3 .pod-block { height: 120px; }
-.podium .pod-rank { font-family: var(--font-d); font-weight: 800; font-size: 56px; color: var(--acc); }
-.podium .pod-name { font-family: var(--font-d); font-weight: 700; font-size: 24px; }
-.podium .pod-score { font-family: var(--font-d); font-weight: 800; font-size: 32px; }
-.standings-table { width: 100%; max-width: 1100px; margin: 0 auto; border-collapse: collapse; }
-.standings-table th { text-align: left; font-family: var(--font-d); font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); font-size: 16px; padding: 12px 18px; border-bottom: 1px solid var(--line2); }
-.standings-table td { padding: 16px 18px; border-bottom: 1px solid var(--line); font-size: 22px; }
-.standings-table .num { font-family: var(--font-d); font-weight: 700; font-variant-numeric: tabular-nums; }
-.standings-table tr.win td { background: var(--acc-glow); }
-.win-banner { text-align: center; animation: pop-in .5s ease 1s both; }
-.win-banner .display { font-size: 110px; color: var(--acc); }
-.standings-table tr.revealed { animation: rise .4s ease both; }
-.drumroll { animation: drum-blink .9s ease-in-out infinite; }
-
-.hint { color: var(--text-faint); font-size: 16px; margin-top: 10px; text-align: center; }
-
-/* ---------- Advance hint + turn chip ---------- */
-.advance-chip-row { display: flex; justify-content: center; margin-top: 16px; }
-.advance-chip { display: inline-flex; align-items: center; gap: 10px; color: var(--text-dim); font-size: 17px; background: rgba(255,255,255,.04); border: 1px solid var(--line); border-radius: 999px; padding: 8px 20px; animation: chip-pulse 1.8s ease-in-out infinite; }
-.keycap { font-family: var(--font-d); font-weight: 700; font-size: 15px; letter-spacing: 1px; text-transform: uppercase; border: 1px solid var(--line2); border-bottom-width: 3px; border-radius: 6px; padding: 1px 10px; color: var(--text); background: rgba(255,255,255,.06); }
-.turn-chip { display: inline-flex; align-items: center; gap: 12px; background: var(--acc-glow); border: 1px solid var(--acc); border-radius: 999px; padding: 8px 24px 8px 8px; animation: pop-in .4s ease both; }
-.turn-chip .avatar { background: var(--acc); color: #0d1117; animation: pulse-ring 1.6s infinite; }
-.turn-chip .tc-name { font-family: var(--font-d); font-weight: 700; font-size: 26px; line-height: 1; }
-.turn-chip .tc-lbl { font-size: 13px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); }
-
-/* ---------- Focus + reduced motion ---------- */
-.btn:focus-visible, input:focus-visible, .draft-card:focus-visible, .shelf-card:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+.hint { margin-top: 56px; color: var(--text-faint); font-size: 18px; animation: rise .6s ease both .3s; }
+.hint kbd {
+  font-family: var(--font-d); font-weight: 700; font-size: 17px;
+  background: rgba(255,255,255,0.07); border: 1px solid var(--line2);
+  border-radius: 7px; padding: 3px 10px; margin: 0 3px; color: var(--text-dim);
 }
 
-/* ---------- Animations ---------- */
-@keyframes scene-in { from { opacity: 0; transform: translateY(14px) scale(.99); } to { opacity: 1; transform: none; } }
-@keyframes scene-out { to { opacity: 0; transform: translateY(-16px) scale(.985); } }
 @keyframes rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
-@keyframes drafted-out { to { opacity: 0; transform: translateX(70px) rotate(5deg); flex-grow: 0.01; padding-left: 0; padding-right: 0; } }
-@keyframes deal-in { from { opacity: 0; transform: translateY(46px) rotate(-2deg) scale(.93); } }
-@keyframes bg-drift { from { transform: translate(0, 0) scale(1); } to { transform: translate(120px, 60px) scale(1.15); } }
-@keyframes slow-spin { to { transform: rotate(360deg); } }
-@keyframes year-slam { 0% { transform: scale(1.6); opacity: 0; filter: blur(6px); } 100% { transform: scale(1); opacity: 1; filter: blur(0); } }
-@keyframes year-glow { to { text-shadow: 0 0 70px var(--acc-glow); } }
-@keyframes badge-slam { 0% { transform: scale(2.6) rotate(-4deg); opacity: 0; } 60% { transform: scale(.92) rotate(0deg); opacity: 1; } 100% { transform: scale(1); } }
-@keyframes shockwave { from { box-shadow: 0 0 0 0 var(--acc-glow); opacity: 1; } to { box-shadow: 0 0 0 44px rgba(200,255,0,0); opacity: 0; } }
-@keyframes id-flip { from { transform: rotateY(90deg); opacity: 0; } to { transform: rotateY(0); opacity: 1; } }
-@keyframes pop-in { 0% { transform: scale(.5); opacity: 0; } 70% { transform: scale(1.12); } 100% { transform: scale(1); opacity: 1; } }
-@keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 var(--acc-glow); } 70% { box-shadow: 0 0 0 12px rgba(200,255,0,0); } 100% { box-shadow: 0 0 0 0 rgba(200,255,0,0); } }
-@keyframes slot-pop { 0% { transform: scale(.3); } 70% { transform: scale(1.18); box-shadow: 0 0 0 14px var(--acc-glow); } 100% { transform: scale(1); } }
-@keyframes flash-out { from { opacity: 1; } to { opacity: 0; } }
-@keyframes shake { 0%, 100% { transform: none; } 20% { transform: translateX(-9px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(3px); } }
-@keyframes podium-rise { from { transform: scaleY(0); opacity: 0; } }
-@keyframes drum-blink { 50% { opacity: .25; } }
-@keyframes chip-pulse { 50% { opacity: .55; transform: translateY(2px); } }
 </style>
 </head>
 <body>
-<div id="root"></div>
-<script type="text/babel" data-presets="react">
-const { useReducer, useState, useEffect, useRef, useCallback } = React;
+<div id="stage">
+  <div class="bg-blob a"></div>
+  <div class="bg-blob b"></div>
 
-/* =========================================================================
-   DATA
-   ========================================================================= */
+  <div class="kicker">One TV · One Host · Everyone Plays</div>
+  <div class="title">Football<span class="dot"> Night</span></div>
+  <div class="subtitle">Pick a game to play</div>
 
-// Position display order of stats for each round.
-const STAT_KEYS = {
-  CB:  ['Age', 'Yellow Cards', 'Goals', 'League Clean Sheets'],
-  WF:  ['Age', 'League G+A', 'League', 'UCL G+A'],
-  DM:  ['Yellow Cards', 'Assists', 'League', 'League G+A'],
-  GK:  ['Saves / Game', 'League Clean Sheets', 'Pens Saved', 'League'],
-  ST:  ['League Goals', 'National Caps', 'League', 'Height'],
-  AM:  ['League Assists', 'UCL Assists', 'Total Goals', 'National Caps'],
-  CB2: ['Age', 'Yellow Cards', 'Goals', 'League Clean Sheets'],
-};
+  <div class="games">
+    <a class="game-card" href="scout.html" id="game-0">
+      <div class="game-key">1</div>
+      <div class="game-emblem">📈</div>
+      <div class="game-name">The <em>Scout</em></div>
+      <div class="game-desc">Blind-invest in real footballers using only stats and market values — no names, no photos. 7 drafts, 2 transfer windows, 1 dramatic reveal.</div>
+      <div class="game-meta">
+        <span class="meta-pill hl">2–6 Managers</span>
+        <span class="meta-pill">9 Seasons</span>
+        <span class="meta-pill">~30 min</span>
+      </div>
+      <div class="play-row">Play <span class="arrow">→</span></div>
+    </a>
 
-const RAW_POOLS = {
-  CB: [{"id":"vandijk","name":"Virgil van Dijk","club":"Southampton","buyVal":22,"sellVal":80,"curVal":35,"stats":{"Age":25,"Yellow Cards":3,"Goals":4,"League Clean Sheets":9}},{"id":"stones","name":"John Stones","club":"Manchester City","buyVal":40,"sellVal":40,"curVal":28,"stats":{"Age":22,"Yellow Cards":2,"Goals":1,"League Clean Sheets":10}},{"id":"rudiger","name":"Antonio Rüdiger","club":"AS Roma","buyVal":18,"sellVal":35,"curVal":25,"stats":{"Age":23,"Yellow Cards":7,"Goals":3,"League Clean Sheets":11}},{"id":"koulibaly","name":"Kalidou Koulibaly","club":"Napoli","buyVal":30,"sellVal":75,"curVal":12,"stats":{"Age":25,"Yellow Cards":9,"Goals":2,"League Clean Sheets":13}},{"id":"bonucci","name":"Leonardo Bonucci","club":"Juventus","buyVal":35,"sellVal":25,"curVal":2,"stats":{"Age":29,"Yellow Cards":6,"Goals":3,"League Clean Sheets":18},"note":"retired"},{"id":"chiellini","name":"Giorgio Chiellini","club":"Juventus","buyVal":22,"sellVal":8,"curVal":3,"stats":{"Age":32,"Yellow Cards":8,"Goals":3,"League Clean Sheets":18},"note":"retired"},{"id":"hummels","name":"Mats Hummels","club":"Bayern Munich","buyVal":35,"sellVal":30,"curVal":2,"stats":{"Age":27,"Yellow Cards":5,"Goals":3,"League Clean Sheets":17},"note":"retired"},{"id":"boateng","name":"Jérôme Boateng","club":"Bayern Munich","buyVal":40,"sellVal":25,"curVal":1,"stats":{"Age":28,"Yellow Cards":4,"Goals":1,"League Clean Sheets":17},"note":"retired"},{"id":"sule","name":"Niklas Süle","club":"TSG Hoffenheim","buyVal":18,"sellVal":45,"curVal":15,"stats":{"Age":20,"Yellow Cards":8,"Goals":1,"League Clean Sheets":8}},{"id":"kimpembe","name":"Presnel Kimpembe","club":"Paris Saint-Germain","buyVal":8,"sellVal":35,"curVal":10,"stats":{"Age":21,"Yellow Cards":4,"Goals":0,"League Clean Sheets":17}},{"id":"marquinhos","name":"Marquinhos","club":"Paris Saint-Germain","buyVal":30,"sellVal":70,"curVal":50,"stats":{"Age":22,"Yellow Cards":3,"Goals":3,"League Clean Sheets":18}},{"id":"umtiti","name":"Samuel Umtiti","club":"FC Barcelona","buyVal":25,"sellVal":40,"curVal":2,"stats":{"Age":22,"Yellow Cards":5,"Goals":1,"League Clean Sheets":17}},{"id":"pique","name":"Gerard Piqué","club":"FC Barcelona","buyVal":40,"sellVal":30,"curVal":3,"stats":{"Age":29,"Yellow Cards":7,"Goals":4,"League Clean Sheets":17},"note":"retired"},{"id":"ramos","name":"Sergio Ramos","club":"Real Madrid","buyVal":40,"sellVal":40,"curVal":2,"stats":{"Age":30,"Yellow Cards":13,"Goals":10,"League Clean Sheets":13},"note":"retired"},{"id":"varane","name":"Raphaël Varane","club":"Real Madrid","buyVal":45,"sellVal":60,"curVal":2,"stats":{"Age":23,"Yellow Cards":4,"Goals":1,"League Clean Sheets":13},"note":"retired"},{"id":"godin","name":"Diego Godín","club":"Atlético Madrid","buyVal":35,"sellVal":15,"curVal":1,"stats":{"Age":30,"Yellow Cards":7,"Goals":4,"League Clean Sheets":20},"note":"retired"},{"id":"gimenez","name":"José María Giménez","club":"Atlético Madrid","buyVal":18,"sellVal":50,"curVal":30,"stats":{"Age":21,"Yellow Cards":6,"Goals":2,"League Clean Sheets":20}},{"id":"azpilicueta","name":"César Azpilicueta","club":"Chelsea","buyVal":25,"sellVal":35,"curVal":2,"stats":{"Age":26,"Yellow Cards":4,"Goals":1,"League Clean Sheets":16},"note":"retired"},{"id":"davidluiz","name":"David Luiz","club":"Chelsea","buyVal":25,"sellVal":18,"curVal":1,"stats":{"Age":29,"Yellow Cards":6,"Goals":1,"League Clean Sheets":16},"note":"retired"},{"id":"alderweireld","name":"Toby Alderweireld","club":"Tottenham Hotspur","buyVal":30,"sellVal":35,"curVal":2,"stats":{"Age":27,"Yellow Cards":3,"Goals":2,"League Clean Sheets":17},"note":"retired"},{"id":"vertonghen","name":"Jan Vertonghen","club":"Tottenham Hotspur","buyVal":25,"sellVal":25,"curVal":1,"stats":{"Age":29,"Yellow Cards":4,"Goals":2,"League Clean Sheets":17},"note":"retired"},{"id":"laporte","name":"Aymeric Laporte","club":"Athletic Bilbao","buyVal":35,"sellVal":60,"curVal":12,"stats":{"Age":22,"Yellow Cards":6,"Goals":2,"League Clean Sheets":10}},{"id":"lenglet","name":"Clément Lenglet","club":"Sevilla","buyVal":15,"sellVal":40,"curVal":6,"stats":{"Age":21,"Yellow Cards":7,"Goals":2,"League Clean Sheets":11}},{"id":"skriniar","name":"Milan Škriniar","club":"Sampdoria","buyVal":8,"sellVal":70,"curVal":15,"stats":{"Age":21,"Yellow Cards":6,"Goals":1,"League Clean Sheets":9}},{"id":"manolas","name":"Kostas Manolas","club":"AS Roma","buyVal":25,"sellVal":30,"curVal":2,"stats":{"Age":25,"Yellow Cards":6,"Goals":2,"League Clean Sheets":11},"note":"retired"},{"id":"devrij","name":"Stefan de Vrij","club":"Lazio","buyVal":15,"sellVal":40,"curVal":4,"stats":{"Age":24,"Yellow Cards":4,"Goals":2,"League Clean Sheets":10}},{"id":"upamecano","name":"Dayot Upamecano","club":"RB Leipzig","buyVal":8,"sellVal":50,"curVal":40,"stats":{"Age":18,"Yellow Cards":2,"Goals":0,"League Clean Sheets":13}},{"id":"deligt","name":"Matthijs de Ligt","club":"Ajax","buyVal":3,"sellVal":85,"curVal":45,"stats":{"Age":17,"Yellow Cards":2,"Goals":1,"League Clean Sheets":10}},{"id":"davinsonsanchez","name":"Davinson Sánchez","club":"Ajax","buyVal":8,"sellVal":50,"curVal":18,"stats":{"Age":20,"Yellow Cards":5,"Goals":2,"League Clean Sheets":11}},{"id":"saliba","name":"William Saliba","club":"Saint-Étienne","buyVal":1,"sellVal":15,"curVal":80,"stats":{"Age":15,"Yellow Cards":0,"Goals":0,"League Clean Sheets":3},"note":"youth setup in 2016/17"}],
-  WF: [{"id":"salah","name":"Mohamed Salah","club":"Liverpool","buyVal":42,"sellVal":150,"curVal":22,"stats":{"Age":25,"League G+A":42,"League":"Premier League","UCL G+A":11}},{"id":"mane","name":"Sadio Mané","club":"Liverpool","buyVal":55,"sellVal":120,"curVal":12,"stats":{"Age":25,"League G+A":17,"League":"Premier League","UCL G+A":6},"note":"now at Al-Nassr"},{"id":"sane","name":"Leroy Sané","club":"Manchester City","buyVal":40,"sellVal":90,"curVal":22,"stats":{"Age":21,"League G+A":24,"League":"Premier League","UCL G+A":0},"note":"now at Galatasaray"},{"id":"sterling","name":"Raheem Sterling","club":"Manchester City","buyVal":50,"sellVal":128,"curVal":15,"stats":{"Age":22,"League G+A":29,"League":"Premier League","UCL G+A":2}},{"id":"mahrez","name":"Riyad Mahrez","club":"Leicester City","buyVal":35,"sellVal":75,"curVal":6,"stats":{"Age":26,"League G+A":22,"League":"Premier League","UCL G+A":0},"note":"now at Al-Ahli"},{"id":"messi","name":"Lionel Messi","club":"Barcelona","buyVal":150,"sellVal":160,"curVal":18,"stats":{"Age":30,"League G+A":46,"League":"La Liga","UCL G+A":8},"note":"now at Inter Miami"},{"id":"dembele","name":"Ousmane Dembélé","club":"Barcelona","buyVal":105,"sellVal":90,"curVal":90,"stats":{"Age":20,"League G+A":7,"League":"La Liga","UCL G+A":0},"note":"now at PSG"},{"id":"ronaldo","name":"Cristiano Ronaldo","club":"Real Madrid","buyVal":100,"sellVal":75,"curVal":12,"stats":{"Age":32,"League G+A":31,"League":"La Liga","UCL G+A":17},"note":"now at Al-Nassr"},{"id":"bale","name":"Gareth Bale","club":"Real Madrid","buyVal":70,"sellVal":50,"curVal":50,"stats":{"Age":28,"League G+A":21,"League":"La Liga","UCL G+A":1},"note":"retired"},{"id":"asensio","name":"Marco Asensio","club":"Real Madrid","buyVal":40,"sellVal":70,"curVal":20,"stats":{"Age":21,"League G+A":11,"League":"La Liga","UCL G+A":4},"note":"now at Fenerbahçe"},{"id":"neymar","name":"Neymar","club":"Paris Saint-Germain","buyVal":180,"sellVal":160,"curVal":4,"stats":{"Age":25,"League G+A":28,"League":"Ligue 1","UCL G+A":7},"note":"now at Santos"},{"id":"mbappe","name":"Kylian Mbappé","club":"Paris Saint-Germain","buyVal":120,"sellVal":200,"curVal":180,"stats":{"Age":18,"League G+A":17,"League":"Ligue 1","UCL G+A":5},"note":"now at Real Madrid"},{"id":"dimaria","name":"Ángel Di María","club":"Paris Saint-Germain","buyVal":40,"sellVal":36,"curVal":2,"stats":{"Age":29,"League G+A":17,"League":"Ligue 1","UCL G+A":3},"note":"now at Rosario Central"},{"id":"sancho","name":"Jadon Sancho","club":"Borussia Dortmund","buyVal":5,"sellVal":100,"curVal":18,"stats":{"Age":17,"League G+A":4,"League":"Bundesliga","UCL G+A":0}},{"id":"pulisic","name":"Christian Pulisic","club":"Borussia Dortmund","buyVal":20,"sellVal":64,"curVal":35,"stats":{"Age":19,"League G+A":11,"League":"Bundesliga","UCL G+A":3},"note":"now at AC Milan"},{"id":"gnabry","name":"Serge Gnabry","club":"TSG Hoffenheim","buyVal":12,"sellVal":50,"curVal":18,"stats":{"Age":22,"League G+A":17,"League":"Bundesliga","UCL G+A":0},"note":"on loan from Bayern"},{"id":"insigne","name":"Lorenzo Insigne","club":"Napoli","buyVal":45,"sellVal":62,"curVal":4,"stats":{"Age":26,"League G+A":29,"League":"Serie A","UCL G+A":2}},{"id":"chiesa","name":"Federico Chiesa","club":"Fiorentina","buyVal":15,"sellVal":50,"curVal":13,"stats":{"Age":20,"League G+A":13,"League":"Serie A","UCL G+A":0},"note":"now at Liverpool"},{"id":"berardi","name":"Domenico Berardi","club":"Sassuolo","buyVal":25,"sellVal":25,"curVal":6,"stats":{"Age":23,"League G+A":12,"League":"Serie A","UCL G+A":0}},{"id":"rashford","name":"Marcus Rashford","club":"Manchester United","buyVal":35,"sellVal":80,"curVal":35,"stats":{"Age":20,"League G+A":12,"League":"Premier League","UCL G+A":1}},{"id":"martial","name":"Anthony Martial","club":"Manchester United","buyVal":45,"sellVal":55,"curVal":3,"stats":{"Age":21,"League G+A":18,"League":"Premier League","UCL G+A":1}},{"id":"son","name":"Heung-min Son","club":"Tottenham Hotspur","buyVal":35,"sellVal":80,"curVal":12,"stats":{"Age":25,"League G+A":18,"League":"Premier League","UCL G+A":4},"note":"now at LAFC"},{"id":"zaha","name":"Wilfried Zaha","club":"Crystal Palace","buyVal":25,"sellVal":50,"curVal":4,"stats":{"Age":24,"League G+A":12,"League":"Premier League","UCL G+A":0}},{"id":"lemar","name":"Thomas Lemar","club":"AS Monaco","buyVal":35,"sellVal":50,"curVal":8,"stats":{"Age":21,"League G+A":13,"League":"Ligue 1","UCL G+A":2}},{"id":"fekir","name":"Nabil Fekir","club":"Lyon","buyVal":35,"sellVal":40,"curVal":6,"stats":{"Age":24,"League G+A":29,"League":"Ligue 1","UCL G+A":0}},{"id":"depay","name":"Memphis Depay","club":"Lyon","buyVal":25,"sellVal":45,"curVal":7,"stats":{"Age":23,"League G+A":27,"League":"Ligue 1","UCL G+A":0},"note":"now at Corinthians"},{"id":"ziyech","name":"Hakim Ziyech","club":"Ajax","buyVal":18,"sellVal":40,"curVal":3,"stats":{"Age":24,"League G+A":21,"League":"Eredivisie","UCL G+A":0}},{"id":"bergwijn","name":"Steven Bergwijn","club":"PSV Eindhoven","buyVal":8,"sellVal":30,"curVal":6,"stats":{"Age":19,"League G+A":13,"League":"Eredivisie","UCL G+A":0},"note":"now at Al-Ittihad"},{"id":"torres","name":"Ferran Torres","club":"Valencia","buyVal":3,"sellVal":25,"curVal":50,"stats":{"Age":17,"League G+A":1,"League":"La Liga","UCL G+A":0},"note":"now at Barcelona"},{"id":"diaz","name":"Luis Díaz","club":"Junior Barranquilla","buyVal":1.5,"sellVal":20,"curVal":70,"stats":{"Age":20,"League G+A":8,"League":"Primera A (Col)","UCL G+A":0},"note":"now at Bayern"}],
-  DM: [{"id":"rodri","name":"Rodri","club":"Atlético Madrid","buyVal":40,"sellVal":70,"curVal":110,"stats":{"Yellow Cards":7,"Assists":1,"League":"La Liga","League G+A":4}},{"id":"rice","name":"Declan Rice","club":"West Ham United","buyVal":12,"sellVal":35,"curVal":120,"stats":{"Yellow Cards":4,"Assists":1,"League":"Premier League","League G+A":3}},{"id":"fabinho","name":"Fabinho","club":"Liverpool","buyVal":50,"sellVal":60,"curVal":8,"stats":{"Yellow Cards":7,"Assists":2,"League":"Premier League","League G+A":3}},{"id":"jorginho","name":"Jorginho","club":"Chelsea","buyVal":50,"sellVal":45,"curVal":7,"stats":{"Yellow Cards":7,"Assists":0,"League":"Premier League","League G+A":2}},{"id":"kante","name":"N'Golo Kanté","club":"Chelsea","buyVal":80,"sellVal":80,"curVal":12,"stats":{"Yellow Cards":3,"Assists":4,"League":"Premier League","League G+A":8}},{"id":"partey","name":"Thomas Partey","club":"Atlético Madrid","buyVal":25,"sellVal":50,"curVal":15,"stats":{"Yellow Cards":8,"Assists":4,"League":"La Liga","League G+A":7}},{"id":"saul","name":"Saúl Ñíguez","club":"Atlético Madrid","buyVal":65,"sellVal":70,"curVal":12,"stats":{"Yellow Cards":7,"Assists":4,"League":"La Liga","League G+A":7}},{"id":"busquets","name":"Sergio Busquets","club":"FC Barcelona","buyVal":40,"sellVal":30,"curVal":2,"stats":{"Yellow Cards":10,"Assists":2,"League":"La Liga","League G+A":2},"note":"now at Inter Miami"},{"id":"arthur","name":"Arthur Melo","club":"FC Barcelona","buyVal":35,"sellVal":40,"curVal":8,"stats":{"Yellow Cards":5,"Assists":1,"League":"La Liga","League G+A":2}},{"id":"casemiro","name":"Casemiro","club":"Real Madrid","buyVal":60,"sellVal":80,"curVal":12,"stats":{"Yellow Cards":12,"Assists":2,"League":"La Liga","League G+A":8}},{"id":"verratti","name":"Marco Verratti","club":"Paris Saint-Germain","buyVal":60,"sellVal":70,"curVal":15,"stats":{"Yellow Cards":7,"Assists":7,"League":"Ligue 1","League G+A":7},"note":"now in Qatar"},{"id":"pjanic","name":"Miralem Pjanić","club":"Juventus","buyVal":55,"sellVal":55,"curVal":3,"stats":{"Yellow Cards":9,"Assists":7,"League":"Serie A","League G+A":11}},{"id":"bentancur","name":"Rodrigo Bentancur","club":"Juventus","buyVal":25,"sellVal":30,"curVal":20,"stats":{"Yellow Cards":8,"Assists":2,"League":"Serie A","League G+A":2}},{"id":"neves","name":"Rúben Neves","club":"Wolverhampton","buyVal":25,"sellVal":40,"curVal":25,"stats":{"Yellow Cards":7,"Assists":3,"League":"Premier League","League G+A":7},"note":"now at Al-Hilal"},{"id":"tielemans","name":"Youri Tielemans","club":"AS Monaco","buyVal":35,"sellVal":40,"curVal":40,"stats":{"Yellow Cards":4,"Assists":4,"League":"Ligue 1","League G+A":8}},{"id":"kamara","name":"Boubacar Kamara","club":"Marseille","buyVal":8,"sellVal":18,"curVal":25,"stats":{"Yellow Cards":6,"Assists":0,"League":"Ligue 1","League G+A":1}},{"id":"zakaria","name":"Denis Zakaria","club":"Mönchengladbach","buyVal":20,"sellVal":28,"curVal":15,"stats":{"Yellow Cards":7,"Assists":2,"League":"Bundesliga","League G+A":3}},{"id":"kimmich","name":"Joshua Kimmich","club":"Bayern Munich","buyVal":55,"sellVal":80,"curVal":40,"stats":{"Yellow Cards":7,"Assists":13,"League":"Bundesliga","League G+A":17}},{"id":"goretzka","name":"Leon Goretzka","club":"Bayern Munich","buyVal":40,"sellVal":50,"curVal":22,"stats":{"Yellow Cards":3,"Assists":4,"League":"Bundesliga","League G+A":13}},{"id":"mckennie","name":"Weston McKennie","club":"Schalke 04","buyVal":8,"sellVal":12,"curVal":18,"stats":{"Yellow Cards":6,"Assists":1,"League":"Bundesliga","League G+A":2}},{"id":"guendouzi","name":"Matteo Guendouzi","club":"Arsenal","buyVal":12,"sellVal":25,"curVal":25,"stats":{"Yellow Cards":6,"Assists":3,"League":"Premier League","League G+A":3}},{"id":"torreira","name":"Lucas Torreira","club":"Arsenal","buyVal":25,"sellVal":30,"curVal":12,"stats":{"Yellow Cards":11,"Assists":1,"League":"Premier League","League G+A":3}},{"id":"ndombele","name":"Tanguy Ndombélé","club":"Olympique Lyonnais","buyVal":30,"sellVal":50,"curVal":12,"stats":{"Yellow Cards":8,"Assists":6,"League":"Ligue 1","League G+A":8}},{"id":"hojbjerg","name":"Pierre-Emile Højbjerg","club":"Southampton","buyVal":15,"sellVal":22,"curVal":18,"stats":{"Yellow Cards":9,"Assists":1,"League":"Premier League","League G+A":3}},{"id":"allan","name":"Allan","club":"Napoli","buyVal":40,"sellVal":45,"curVal":2,"stats":{"Yellow Cards":11,"Assists":3,"League":"Serie A","League G+A":4}},{"id":"milinkovic","name":"Sergej Milinković-Savić","club":"Lazio","buyVal":70,"sellVal":70,"curVal":20,"stats":{"Yellow Cards":7,"Assists":2,"League":"Serie A","League G+A":7},"note":"now at Al-Hilal"},{"id":"tchouameni","name":"Aurélien Tchouaméni","club":"Girondins de Bordeaux","buyVal":3,"sellVal":18,"curVal":70,"stats":{"Yellow Cards":4,"Assists":0,"League":"Ligue 1","League G+A":1}},{"id":"tonali","name":"Sandro Tonali","club":"Brescia","buyVal":2,"sellVal":35,"curVal":55,"stats":{"Yellow Cards":9,"Assists":4,"League":"Serie B","League G+A":6}},{"id":"dejong","name":"Frenkie de Jong","club":"Ajax","buyVal":20,"sellVal":75,"curVal":45,"stats":{"Yellow Cards":4,"Assists":8,"League":"Eredivisie","League G+A":11}},{"id":"bennacer","name":"Ismaël Bennacer","club":"Empoli","buyVal":5,"sellVal":18,"curVal":15,"stats":{"Yellow Cards":11,"Assists":2,"League":"Serie A","League G+A":3}}],
-  GK: [{"id":"donnarumma","name":"Gianluigi Donnarumma","club":"AC Milan","buyVal":60,"sellVal":40,"curVal":35,"stats":{"Saves / Game":3.3,"League Clean Sheets":14,"Pens Saved":1,"League":"Serie A"}},{"id":"maignan","name":"Mike Maignan","club":"Lille","buyVal":18,"sellVal":40,"curVal":30,"stats":{"Saves / Game":2.4,"League Clean Sheets":21,"Pens Saved":2,"League":"Ligue 1"}},{"id":"martinez","name":"Emiliano Martínez","club":"Aston Villa","buyVal":22,"sellVal":35,"curVal":25,"stats":{"Saves / Game":3.4,"League Clean Sheets":15,"Pens Saved":1,"League":"Premier League"}},{"id":"mendy","name":"Édouard Mendy","club":"Chelsea","buyVal":25,"sellVal":12,"curVal":6,"stats":{"Saves / Game":2.3,"League Clean Sheets":16,"Pens Saved":1,"League":"Premier League"},"note":"now at Al-Ahli"},{"id":"alisson","name":"Alisson","club":"Liverpool","buyVal":70,"sellVal":32,"curVal":20,"stats":{"Saves / Game":2.6,"League Clean Sheets":10,"Pens Saved":0,"League":"Premier League"}},{"id":"ederson","name":"Ederson","club":"Manchester City","buyVal":60,"sellVal":30,"curVal":18,"stats":{"Saves / Game":2,"League Clean Sheets":19,"Pens Saved":0,"League":"Premier League"},"note":"now at Fenerbahçe"},{"id":"neuer","name":"Manuel Neuer","club":"Bayern Munich","buyVal":24,"sellVal":6,"curVal":4,"stats":{"Saves / Game":2.5,"League Clean Sheets":12,"Pens Saved":0,"League":"Bundesliga"}},{"id":"terstegen","name":"Marc-André ter Stegen","club":"FC Barcelona","buyVal":60,"sellVal":24,"curVal":12,"stats":{"Saves / Game":2.7,"League Clean Sheets":13,"Pens Saved":1,"League":"La Liga"}},{"id":"courtois","name":"Thibaut Courtois","club":"Real Madrid","buyVal":60,"sellVal":40,"curVal":30,"stats":{"Saves / Game":2.6,"League Clean Sheets":17,"Pens Saved":1,"League":"La Liga"}},{"id":"oblak","name":"Jan Oblak","club":"Atlético Madrid","buyVal":90,"sellVal":35,"curVal":18,"stats":{"Saves / Game":2.3,"League Clean Sheets":18,"Pens Saved":1,"League":"La Liga"}},{"id":"navas","name":"Keylor Navas","club":"Paris Saint-Germain","buyVal":18,"sellVal":4,"curVal":1,"stats":{"Saves / Game":2.6,"League Clean Sheets":13,"Pens Saved":1,"League":"Ligue 1"},"note":"retired"},{"id":"szczesny","name":"Wojciech Szczęsny","club":"Juventus","buyVal":32,"sellVal":10,"curVal":4,"stats":{"Saves / Game":2.4,"League Clean Sheets":14,"Pens Saved":1,"League":"Serie A"},"note":"now at Barcelona"},{"id":"handanovic","name":"Samir Handanović","club":"Inter","buyVal":12,"sellVal":1,"curVal":1,"stats":{"Saves / Game":2.1,"League Clean Sheets":17,"Pens Saved":0,"League":"Serie A"},"note":"retired"},{"id":"lloris","name":"Hugo Lloris","club":"Tottenham Hotspur","buyVal":18,"sellVal":5,"curVal":2,"stats":{"Saves / Game":3,"League Clean Sheets":9,"Pens Saved":0,"League":"Premier League"},"note":"now at LAFC"},{"id":"schmeichel","name":"Kasper Schmeichel","club":"Leicester City","buyVal":14,"sellVal":3,"curVal":2,"stats":{"Saves / Game":3,"League Clean Sheets":11,"Pens Saved":0,"League":"Premier League"}},{"id":"ramsdale","name":"Aaron Ramsdale","club":"Sheffield United","buyVal":10,"sellVal":25,"curVal":14,"stats":{"Saves / Game":3.7,"League Clean Sheets":6,"Pens Saved":1,"League":"Premier League"}},{"id":"pope","name":"Nick Pope","club":"Burnley","buyVal":22,"sellVal":18,"curVal":10,"stats":{"Saves / Game":3,"League Clean Sheets":11,"Pens Saved":0,"League":"Premier League"}},{"id":"pickford","name":"Jordan Pickford","club":"Everton","buyVal":28,"sellVal":25,"curVal":20,"stats":{"Saves / Game":2.8,"League Clean Sheets":10,"Pens Saved":1,"League":"Premier League"}},{"id":"sommer","name":"Yann Sommer","club":"Mönchengladbach","buyVal":12,"sellVal":8,"curVal":4,"stats":{"Saves / Game":3.3,"League Clean Sheets":9,"Pens Saved":1,"League":"Bundesliga"},"note":"now at Inter"},{"id":"trapp","name":"Kevin Trapp","club":"Eintracht Frankfurt","buyVal":10,"sellVal":6,"curVal":3,"stats":{"Saves / Game":3.4,"League Clean Sheets":8,"Pens Saved":1,"League":"Bundesliga"}},{"id":"gulacsi","name":"Péter Gulácsi","club":"RB Leipzig","buyVal":18,"sellVal":7,"curVal":4,"stats":{"Saves / Game":2.4,"League Clean Sheets":13,"Pens Saved":0,"League":"Bundesliga"}},{"id":"hradecky","name":"Lukáš Hrádecký","club":"Bayer Leverkusen","buyVal":12,"sellVal":6,"curVal":3,"stats":{"Saves / Game":3,"League Clean Sheets":10,"Pens Saved":1,"League":"Bundesliga"}},{"id":"lopes","name":"Anthony Lopes","club":"Lyon","buyVal":14,"sellVal":4,"curVal":2,"stats":{"Saves / Game":2.8,"League Clean Sheets":12,"Pens Saved":1,"League":"Ligue 1"}},{"id":"patricio","name":"Rui Patrício","club":"Wolverhampton","buyVal":14,"sellVal":4,"curVal":1,"stats":{"Saves / Game":3.2,"League Clean Sheets":9,"Pens Saved":0,"League":"Premier League"}},{"id":"simon","name":"Unai Simón","club":"Athletic Bilbao","buyVal":15,"sellVal":30,"curVal":22,"stats":{"Saves / Game":2.7,"League Clean Sheets":13,"Pens Saved":1,"League":"La Liga"}},{"id":"kobel","name":"Gregor Kobel","club":"VfB Stuttgart","buyVal":8,"sellVal":35,"curVal":35,"stats":{"Saves / Game":3.5,"League Clean Sheets":8,"Pens Saved":1,"League":"Bundesliga"},"note":"now at Dortmund"},{"id":"degea","name":"David de Gea","club":"Manchester United","buyVal":30,"sellVal":5,"curVal":7,"stats":{"Saves / Game":2.7,"League Clean Sheets":8,"Pens Saved":0,"League":"Premier League"},"note":"now at Fiorentina"},{"id":"onana","name":"André Onana","club":"Ajax","buyVal":24,"sellVal":35,"curVal":12,"stats":{"Saves / Game":1.9,"League Clean Sheets":9,"Pens Saved":0,"League":"Eredivisie"}},{"id":"raya","name":"David Raya","club":"Brentford","buyVal":8,"sellVal":32,"curVal":28,"stats":{"Saves / Game":3.1,"League Clean Sheets":15,"Pens Saved":1,"League":"Championship"},"note":"now at Arsenal"},{"id":"costa","name":"Diogo Costa","club":"FC Porto","buyVal":8,"sellVal":30,"curVal":30,"stats":{"Saves / Game":2.4,"League Clean Sheets":16,"Pens Saved":1,"League":"Primeira Liga"}}],
-  ST: [{"id":"haaland","name":"Erling Haaland","club":"Borussia Dortmund","buyVal":100,"sellVal":180,"curVal":200,"stats":{"League Goals":22,"National Caps":17,"League":"Bundesliga","Height":"194cm"}},{"id":"lewandowski","name":"Robert Lewandowski","club":"Bayern Munich","buyVal":60,"sellVal":30,"curVal":10,"stats":{"League Goals":35,"National Caps":128,"League":"Bundesliga","Height":"185cm"}},{"id":"benzema","name":"Karim Benzema","club":"Real Madrid","buyVal":35,"sellVal":8,"curVal":4,"stats":{"League Goals":27,"National Caps":90,"League":"La Liga","Height":"185cm"},"note":"now at Al-Ittihad"},{"id":"osimhen","name":"Victor Osimhen","club":"Napoli","buyVal":55,"sellVal":100,"curVal":75,"stats":{"League Goals":14,"National Caps":18,"League":"Serie A","Height":"185cm"}},{"id":"immobile","name":"Ciro Immobile","club":"Lazio","buyVal":30,"sellVal":12,"curVal":3,"stats":{"League Goals":27,"National Caps":54,"League":"Serie A","Height":"185cm"}},{"id":"vlahovic","name":"Dušan Vlahović","club":"Fiorentina","buyVal":60,"sellVal":65,"curVal":35,"stats":{"League Goals":17,"National Caps":9,"League":"Serie A","Height":"190cm"}},{"id":"martinez","name":"Lautaro Martínez","club":"Inter","buyVal":75,"sellVal":110,"curVal":90,"stats":{"League Goals":21,"National Caps":38,"League":"Serie A","Height":"174cm"}},{"id":"kane","name":"Harry Kane","club":"Tottenham Hotspur","buyVal":100,"sellVal":90,"curVal":80,"stats":{"League Goals":17,"National Caps":67,"League":"Premier League","Height":"188cm"}},{"id":"ronaldo","name":"Cristiano Ronaldo","club":"Manchester United","buyVal":45,"sellVal":15,"curVal":12,"stats":{"League Goals":18,"National Caps":184,"League":"Premier League","Height":"187cm"},"note":"now at Al-Nassr"},{"id":"lukaku","name":"Romelu Lukaku","club":"Chelsea","buyVal":100,"sellVal":35,"curVal":18,"stats":{"League Goals":8,"National Caps":99,"League":"Premier League","Height":"191cm"}},{"id":"aubameyang","name":"Pierre-Emerick Aubameyang","club":"Arsenal","buyVal":30,"sellVal":8,"curVal":3,"stats":{"League Goals":4,"National Caps":70,"League":"Premier League","Height":"187cm"}},{"id":"jesus","name":"Gabriel Jesus","club":"Manchester City","buyVal":50,"sellVal":50,"curVal":25,"stats":{"League Goals":8,"National Caps":50,"League":"Premier League","Height":"175cm"}},{"id":"schick","name":"Patrik Schick","club":"Bayer Leverkusen","buyVal":28,"sellVal":25,"curVal":25,"stats":{"League Goals":24,"National Caps":32,"League":"Bundesliga","Height":"187cm"}},{"id":"weghorst","name":"Wout Weghorst","club":"VfL Wolfsburg","buyVal":20,"sellVal":10,"curVal":6,"stats":{"League Goals":9,"National Caps":15,"League":"Bundesliga","Height":"197cm"}},{"id":"isak","name":"Alexander Isak","club":"Real Sociedad","buyVal":35,"sellVal":70,"curVal":120,"stats":{"League Goals":6,"National Caps":23,"League":"La Liga","Height":"192cm"}},{"id":"benyedder","name":"Wissam Ben Yedder","club":"AS Monaco","buyVal":30,"sellVal":10,"curVal":2,"stats":{"League Goals":25,"National Caps":19,"League":"Ligue 1","Height":"170cm"}},{"id":"david","name":"Jonathan David","club":"Lille","buyVal":35,"sellVal":45,"curVal":40,"stats":{"League Goals":19,"National Caps":25,"League":"Ligue 1","Height":"180cm"},"note":"now at Juventus"},{"id":"belotti","name":"Andrea Belotti","club":"Torino","buyVal":25,"sellVal":6,"curVal":2,"stats":{"League Goals":8,"National Caps":38,"League":"Serie A","Height":"181cm"}},{"id":"abraham","name":"Tammy Abraham","club":"AS Roma","buyVal":40,"sellVal":30,"curVal":20,"stats":{"League Goals":17,"National Caps":11,"League":"Serie A","Height":"194cm"}},{"id":"calvertlewin","name":"Dominic Calvert-Lewin","club":"Everton","buyVal":50,"sellVal":25,"curVal":15,"stats":{"League Goals":5,"National Caps":11,"League":"Premier League","Height":"187cm"}},{"id":"watkins","name":"Ollie Watkins","club":"Aston Villa","buyVal":32,"sellVal":50,"curVal":40,"stats":{"League Goals":11,"National Caps":0,"League":"Premier League","Height":"180cm"}},{"id":"nkunku","name":"Christopher Nkunku","club":"RB Leipzig","buyVal":45,"sellVal":60,"curVal":30,"stats":{"League Goals":20,"National Caps":1,"League":"Bundesliga","Height":"175cm"}},{"id":"haller","name":"Sébastien Haller","club":"Ajax","buyVal":25,"sellVal":20,"curVal":6,"stats":{"League Goals":21,"National Caps":5,"League":"Eredivisie","Height":"190cm"}},{"id":"nunez","name":"Darwin Núñez","club":"Benfica","buyVal":35,"sellVal":70,"curVal":45,"stats":{"League Goals":26,"National Caps":8,"League":"Primeira Liga","Height":"187cm"}},{"id":"adeyemi","name":"Karim Adeyemi","club":"RB Salzburg","buyVal":25,"sellVal":38,"curVal":40,"stats":{"League Goals":16,"National Caps":3,"League":"Austrian Bundesliga","Height":"180cm"}},{"id":"gyokeres","name":"Viktor Gyökeres","club":"Coventry City","buyVal":3,"sellVal":50,"curVal":65,"stats":{"League Goals":17,"National Caps":3,"League":"Championship","Height":"189cm"},"note":"now at Arsenal"},{"id":"kolomuani","name":"Randal Kolo Muani","club":"Nantes","buyVal":8,"sellVal":80,"curVal":35,"stats":{"League Goals":12,"National Caps":0,"League":"Ligue 1","Height":"187cm"}},{"id":"ekitike","name":"Hugo Ekitiké","club":"Stade de Reims","buyVal":5,"sellVal":30,"curVal":80,"stats":{"League Goals":10,"National Caps":0,"League":"Ligue 1","Height":"189cm"},"note":"now at Liverpool"},{"id":"sesko","name":"Benjamin Šeško","club":"RB Salzburg","buyVal":5,"sellVal":45,"curVal":70,"stats":{"League Goals":6,"National Caps":8,"League":"Austrian Bundesliga","Height":"195cm"},"note":"now at Man Utd"},{"id":"balogun","name":"Folarin Balogun","club":"Middlesbrough","buyVal":8,"sellVal":35,"curVal":25,"stats":{"League Goals":3,"National Caps":0,"League":"Championship","Height":"178cm"},"note":"now at Monaco"}],
-  AM: [{"id":"bellingham","name":"Jude Bellingham","club":"Borussia Dortmund","buyVal":80,"sellVal":150,"curVal":180,"stats":{"League Assists":4,"UCL Assists":0,"Total Goals":14,"National Caps":23}},{"id":"pedri","name":"Pedri","club":"Barcelona","buyVal":80,"sellVal":90,"curVal":140,"stats":{"League Assists":3,"UCL Assists":0,"Total Goals":7,"National Caps":18}},{"id":"gavi","name":"Gavi","club":"Barcelona","buyVal":70,"sellVal":90,"curVal":50,"stats":{"League Assists":6,"UCL Assists":0,"Total Goals":3,"National Caps":18}},{"id":"musiala","name":"Jamal Musiala","club":"Bayern Munich","buyVal":80,"sellVal":110,"curVal":140,"stats":{"League Assists":10,"UCL Assists":1,"Total Goals":16,"National Caps":22}},{"id":"wirtz","name":"Florian Wirtz","club":"Bayer Leverkusen","buyVal":55,"sellVal":110,"curVal":140,"stats":{"League Assists":3,"UCL Assists":0,"Total Goals":7,"National Caps":10},"note":"now at Liverpool"},{"id":"odegaard","name":"Martin Ødegaard","club":"Arsenal","buyVal":75,"sellVal":90,"curVal":70,"stats":{"League Assists":7,"UCL Assists":0,"Total Goals":15,"National Caps":48}},{"id":"foden","name":"Phil Foden","club":"Manchester City","buyVal":110,"sellVal":140,"curVal":100,"stats":{"League Assists":3,"UCL Assists":1,"Total Goals":15,"National Caps":18}},{"id":"bernardo","name":"Bernardo Silva","club":"Manchester City","buyVal":80,"sellVal":70,"curVal":50,"stats":{"League Assists":7,"UCL Assists":3,"Total Goals":7,"National Caps":80}},{"id":"debruyne","name":"Kevin De Bruyne","club":"Manchester City","buyVal":70,"sellVal":50,"curVal":20,"stats":{"League Assists":16,"UCL Assists":3,"Total Goals":10,"National Caps":94},"note":"now at Napoli"},{"id":"fernandes","name":"Bruno Fernandes","club":"Manchester United","buyVal":75,"sellVal":75,"curVal":50,"stats":{"League Assists":8,"UCL Assists":0,"Total Goals":14,"National Caps":53}},{"id":"kvaratskhelia","name":"Khvicha Kvaratskhelia","club":"Napoli","buyVal":35,"sellVal":80,"curVal":80,"stats":{"League Assists":9,"UCL Assists":4,"Total Goals":13,"National Caps":24},"note":"now at PSG"},{"id":"leao","name":"Rafael Leão","club":"AC Milan","buyVal":70,"sellVal":90,"curVal":70,"stats":{"League Assists":8,"UCL Assists":1,"Total Goals":15,"National Caps":13}},{"id":"barella","name":"Nicolò Barella","club":"Inter","buyVal":75,"sellVal":80,"curVal":75,"stats":{"League Assists":7,"UCL Assists":3,"Total Goals":7,"National Caps":42}},{"id":"calhanoglu","name":"Hakan Çalhanoğlu","club":"Inter","buyVal":35,"sellVal":35,"curVal":30,"stats":{"League Assists":6,"UCL Assists":2,"Total Goals":11,"National Caps":76}},{"id":"pellegrini","name":"Lorenzo Pellegrini","club":"AS Roma","buyVal":45,"sellVal":35,"curVal":20,"stats":{"League Assists":7,"UCL Assists":0,"Total Goals":11,"National Caps":24}},{"id":"dybala","name":"Paulo Dybala","club":"AS Roma","buyVal":35,"sellVal":35,"curVal":18,"stats":{"League Assists":7,"UCL Assists":0,"Total Goals":18,"National Caps":34}},{"id":"valverde","name":"Federico Valverde","club":"Real Madrid","buyVal":100,"sellVal":130,"curVal":120,"stats":{"League Assists":3,"UCL Assists":2,"Total Goals":12,"National Caps":52}},{"id":"felix","name":"João Félix","club":"Atlético Madrid","buyVal":80,"sellVal":50,"curVal":30,"stats":{"League Assists":4,"UCL Assists":0,"Total Goals":10,"National Caps":24}},{"id":"olmo","name":"Dani Olmo","club":"RB Leipzig","buyVal":40,"sellVal":50,"curVal":50,"stats":{"League Assists":5,"UCL Assists":0,"Total Goals":8,"National Caps":24},"note":"now at Barcelona"},{"id":"nkunku","name":"Christopher Nkunku","club":"RB Leipzig","buyVal":75,"sellVal":60,"curVal":40,"stats":{"League Assists":3,"UCL Assists":2,"Total Goals":23,"National Caps":7}},{"id":"brandt","name":"Julian Brandt","club":"Borussia Dortmund","buyVal":30,"sellVal":40,"curVal":25,"stats":{"League Assists":7,"UCL Assists":0,"Total Goals":13,"National Caps":36}},{"id":"reus","name":"Marco Reus","club":"Borussia Dortmund","buyVal":12,"sellVal":8,"curVal":4,"stats":{"League Assists":5,"UCL Assists":1,"Total Goals":12,"National Caps":48},"note":"now at LA Galaxy"},{"id":"kulusevski","name":"Dejan Kulusevski","club":"Tottenham Hotspur","buyVal":45,"sellVal":50,"curVal":50,"stats":{"League Assists":5,"UCL Assists":0,"Total Goals":3,"National Caps":33}},{"id":"maddison","name":"James Maddison","club":"Leicester City","buyVal":45,"sellVal":50,"curVal":40,"stats":{"League Assists":9,"UCL Assists":0,"Total Goals":10,"National Caps":1}},{"id":"eze","name":"Eberechi Eze","club":"Crystal Palace","buyVal":30,"sellVal":50,"curVal":65,"stats":{"League Assists":4,"UCL Assists":0,"Total Goals":10,"National Caps":0},"note":"now at Arsenal"},{"id":"aouar","name":"Houssem Aouar","club":"Olympique Lyonnais","buyVal":25,"sellVal":12,"curVal":8,"stats":{"League Assists":2,"UCL Assists":0,"Total Goals":3,"National Caps":1}},{"id":"enzo","name":"Enzo Fernández","club":"Benfica","buyVal":50,"sellVal":80,"curVal":70,"stats":{"League Assists":5,"UCL Assists":2,"Total Goals":6,"National Caps":17},"note":"joined Chelsea Jan 2023"},{"id":"guler","name":"Arda Güler","club":"Fenerbahçe","buyVal":8,"sellVal":25,"curVal":60,"stats":{"League Assists":7,"UCL Assists":0,"Total Goals":6,"National Caps":4},"note":"now at Real Madrid"},{"id":"palmer","name":"Cole Palmer","club":"Manchester City","buyVal":12,"sellVal":40,"curVal":80,"stats":{"League Assists":1,"UCL Assists":0,"Total Goals":6,"National Caps":0},"note":"now at Chelsea"},{"id":"fabianruiz","name":"Fabián Ruiz","club":"Paris Saint-Germain","buyVal":30,"sellVal":35,"curVal":45,"stats":{"League Assists":3,"UCL Assists":0,"Total Goals":3,"National Caps":17}}],
-  CB2: [{"id":"bastoni","name":"Alessandro Bastoni","club":"Inter","buyVal":70,"sellVal":80,"curVal":80,"stats":{"Age":25,"Yellow Cards":4,"Goals":2,"League Clean Sheets":16}},{"id":"magalhaes","name":"Gabriel Magalhães","club":"Arsenal","buyVal":55,"sellVal":75,"curVal":75,"stats":{"Age":27,"Yellow Cards":6,"Goals":5,"League Clean Sheets":14}},{"id":"cubarsi","name":"Pau Cubarsí","club":"Barcelona","buyVal":50,"sellVal":80,"curVal":80,"stats":{"Age":17,"Yellow Cards":3,"Goals":0,"League Clean Sheets":12}},{"id":"araujo","name":"Ronald Araújo","club":"Barcelona","buyVal":60,"sellVal":45,"curVal":45,"stats":{"Age":25,"Yellow Cards":4,"Goals":1,"League Clean Sheets":9}},{"id":"yoro","name":"Leny Yoro","club":"Manchester United","buyVal":45,"sellVal":55,"curVal":55,"stats":{"Age":18,"Yellow Cards":2,"Goals":1,"League Clean Sheets":8}},{"id":"calafiori","name":"Riccardo Calafiori","club":"Arsenal","buyVal":45,"sellVal":50,"curVal":50,"stats":{"Age":22,"Yellow Cards":3,"Goals":2,"League Clean Sheets":12}},{"id":"huijsen","name":"Dean Huijsen","club":"Bournemouth","buyVal":18,"sellVal":60,"curVal":60,"stats":{"Age":19,"Yellow Cards":5,"Goals":2,"League Clean Sheets":10},"note":"to Real Madrid summer 2025"},{"id":"murillo","name":"Murillo","club":"Nottingham Forest","buyVal":35,"sellVal":50,"curVal":50,"stats":{"Age":22,"Yellow Cards":9,"Goals":1,"League Clean Sheets":13}},{"id":"schlotterbeck","name":"Nico Schlotterbeck","club":"Borussia Dortmund","buyVal":45,"sellVal":55,"curVal":55,"stats":{"Age":24,"Yellow Cards":5,"Goals":3,"League Clean Sheets":11}},{"id":"vandeven","name":"Micky van de Ven","club":"Tottenham","buyVal":50,"sellVal":70,"curVal":70,"stats":{"Age":23,"Yellow Cards":2,"Goals":1,"League Clean Sheets":9}},{"id":"colwill","name":"Levi Colwill","club":"Chelsea","buyVal":45,"sellVal":50,"curVal":50,"stats":{"Age":21,"Yellow Cards":5,"Goals":1,"League Clean Sheets":12}},{"id":"lukeba","name":"Castello Lukeba","club":"RB Leipzig","buyVal":40,"sellVal":50,"curVal":50,"stats":{"Age":21,"Yellow Cards":6,"Goals":1,"League Clean Sheets":9}},{"id":"lacroix","name":"Maxence Lacroix","club":"Crystal Palace","buyVal":20,"sellVal":35,"curVal":35,"stats":{"Age":24,"Yellow Cards":8,"Goals":2,"League Clean Sheets":13}},{"id":"solet","name":"Oumar Solet","club":"Udinese","buyVal":12,"sellVal":30,"curVal":30,"stats":{"Age":24,"Yellow Cards":5,"Goals":1,"League Clean Sheets":9}},{"id":"gvardiol","name":"Joško Gvardiol","club":"Manchester City","buyVal":75,"sellVal":70,"curVal":70,"stats":{"Age":22,"Yellow Cards":4,"Goals":5,"League Clean Sheets":13}},{"id":"romero","name":"Cristian Romero","club":"Tottenham","buyVal":55,"sellVal":45,"curVal":45,"stats":{"Age":26,"Yellow Cards":7,"Goals":3,"League Clean Sheets":9}},{"id":"bremer","name":"Gleison Bremer","club":"Juventus","buyVal":55,"sellVal":35,"curVal":35,"stats":{"Age":27,"Yellow Cards":2,"Goals":1,"League Clean Sheets":4},"note":"ACL injury Oct 2024"},{"id":"buongiorno","name":"Alessandro Buongiorno","club":"Napoli","buyVal":40,"sellVal":42,"curVal":42,"stats":{"Age":25,"Yellow Cards":4,"Goals":1,"League Clean Sheets":15}},{"id":"fofana","name":"Wesley Fofana","club":"Chelsea","buyVal":35,"sellVal":28,"curVal":28,"stats":{"Age":23,"Yellow Cards":3,"Goals":0,"League Clean Sheets":8}},{"id":"guehi","name":"Marc Guéhi","club":"Crystal Palace","buyVal":45,"sellVal":55,"curVal":55,"stats":{"Age":24,"Yellow Cards":4,"Goals":2,"League Clean Sheets":13}},{"id":"pacho","name":"William Pacho","club":"Paris Saint-Germain","buyVal":40,"sellVal":65,"curVal":65,"stats":{"Age":23,"Yellow Cards":4,"Goals":1,"League Clean Sheets":18}},{"id":"tah","name":"Jonathan Tah","club":"Bayer Leverkusen","buyVal":40,"sellVal":40,"curVal":40,"stats":{"Age":28,"Yellow Cards":3,"Goals":2,"League Clean Sheets":13},"note":"now at Bayern"},{"id":"tapsoba","name":"Edmond Tapsoba","club":"Bayer Leverkusen","buyVal":40,"sellVal":40,"curVal":40,"stats":{"Age":25,"Yellow Cards":5,"Goals":1,"League Clean Sheets":13}},{"id":"pautorres","name":"Pau Torres","club":"Aston Villa","buyVal":35,"sellVal":32,"curVal":32,"stats":{"Age":27,"Yellow Cards":3,"Goals":1,"League Clean Sheets":11}},{"id":"branthwaite","name":"Jarrad Branthwaite","club":"Everton","buyVal":50,"sellVal":55,"curVal":55,"stats":{"Age":22,"Yellow Cards":4,"Goals":3,"League Clean Sheets":13}},{"id":"pavard","name":"Benjamin Pavard","club":"Inter","buyVal":35,"sellVal":25,"curVal":25,"stats":{"Age":28,"Yellow Cards":4,"Goals":2,"League Clean Sheets":16}},{"id":"kim","name":"Kim Min-jae","club":"Bayern Munich","buyVal":40,"sellVal":20,"curVal":20,"stats":{"Age":27,"Yellow Cards":5,"Goals":2,"League Clean Sheets":12}},{"id":"geertruida","name":"Lutsharel Geertruida","club":"RB Leipzig","buyVal":25,"sellVal":22,"curVal":22,"stats":{"Age":24,"Yellow Cards":4,"Goals":1,"League Clean Sheets":9}},{"id":"diomande","name":"Ousmane Diomande","club":"Sporting CP","buyVal":35,"sellVal":35,"curVal":35,"stats":{"Age":21,"Yellow Cards":7,"Goals":1,"League Clean Sheets":14}},{"id":"inacio","name":"Gonçalo Inácio","club":"Sporting CP","buyVal":40,"sellVal":40,"curVal":40,"stats":{"Age":23,"Yellow Cards":4,"Goals":3,"League Clean Sheets":14}}],
-};
-const DRAFT_POOLS = {};
-Object.keys(RAW_POOLS).forEach(pos => {
-  DRAFT_POOLS[pos] = RAW_POOLS[pos].map(p => ({ ...p, id: pos.toLowerCase() + '_' + p.id, pos, statKeys: STAT_KEYS[pos] }));
+    <a class="game-card" href="trivia.html" id="game-1">
+      <div class="game-key">2</div>
+      <div class="game-emblem">🏆</div>
+      <div class="game-name">World Cup <em>Trivia</em></div>
+      <div class="game-desc">From the Maracanazo to the Hand of God — a pass-and-play quiz on World Cup history. Beat the clock for bonus points and climb the leaderboard.</div>
+      <div class="game-meta">
+        <span class="meta-pill hl">1–6 Players</span>
+        <span class="meta-pill">51 Questions</span>
+        <span class="meta-pill">~15 min</span>
+      </div>
+      <div class="play-row">Play <span class="arrow">→</span></div>
+    </a>
+  </div>
+
+  <div class="hint">Press <kbd>1</kbd> or <kbd>2</kbd> to launch · <kbd>←</kbd><kbd>→</kbd> + <kbd>Enter</kbd> to choose</div>
+</div>
+
+<script>
+// Scale the fixed 1920×1080 stage to fit the window
+function fit() {
+  const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+  document.getElementById('stage').style.transform = `translate(-50%, -50%) scale(${s})`;
+}
+fit();
+window.addEventListener('resize', fit);
+
+const cards = [document.getElementById('game-0'), document.getElementById('game-1')];
+let focused = -1;
+function setFocus(i) {
+  focused = (i + cards.length) % cards.length;
+  cards.forEach((c, j) => c.classList.toggle('focused', j === focused));
+}
+window.addEventListener('keydown', (e) => {
+  if (e.key === '1') { cards[0].click(); }
+  else if (e.key === '2') { cards[1].click(); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); setFocus(focused < 0 ? 0 : focused + 1); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); setFocus(focused < 0 ? cards.length - 1 : focused - 1); }
+  else if (e.key === 'Enter' && focused >= 0) { cards[focused].click(); }
 });
-
-const PLAYER_BY_ID = {};
-Object.values(DRAFT_POOLS).forEach(pool => pool.forEach(p => { PLAYER_BY_ID[p.id] = p; }));
-
-const SEASON_SEQUENCE = [
-  { step:0, yr:'2016/17', type:'draft',  pos:'CB',  label:'Centre Back' },
-  { step:1, yr:'2017/18', type:'draft',  pos:'WF',  label:'Winger' },
-  { step:2, yr:'2018/19', type:'draft',  pos:'DM',  label:'Defensive Mid' },
-  { step:3, yr:'2019/20', type:'window', window:1,  positions:['CB','WF','DM'], label:'Transfer Window' },
-  { step:4, yr:'2020/21', type:'draft',  pos:'GK',  label:'Goalkeeper' },
-  { step:5, yr:'2021/22', type:'draft',  pos:'ST',  label:'Striker' },
-  { step:6, yr:'2022/23', type:'draft',  pos:'AM',  label:'Attacking Mid' },
-  { step:7, yr:'2023/24', type:'window', window:2,  positions:['GK','ST','AM'], label:'Transfer Window' },
-  { step:8, yr:'2024/25', type:'draft',  pos:'CB2', label:'Centre Back #2' },
-  { step:9, yr:'2025/26', type:'reveal', label:'Final Reveal' },
-];
-
-// Order positions are revealed back-to-front on the pitch.
-const PITCH_ORDER = ['GK','CB','CB2','DM','AM','WF','ST'];
-const POS_LABEL = { GK:'GK', CB:'CB', CB2:'CB', DM:'DM', AM:'AM', WF:'WF', ST:'ST' };
-
-/* =========================================================================
-   HELPERS + HOOKS
-   ========================================================================= */
-
-function shuffle(arr) {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-// Draft weighting — surface popular/better players more often than obscure ones.
-// `prominence` blends fame (the value shown on the draft card) with quality (the best
-// value the player ever reaches). `draftWeight` lightly compresses it so stars are
-// clearly favored but underdogs still appear for variety. All three constants below
-// are single-line tunables: raise the exponent / lower the floor for a stronger skew.
-function prominence(p) {
-  const peak = Math.max(p.buyVal || 0, p.sellVal || 0, p.curVal || 0);
-  return 0.6 * (p.buyVal || 0) + 0.4 * peak;        // fame-leaning blend
-}
-function draftWeight(p) {
-  return Math.pow(prominence(p), 0.6) + 4;          // 0.6 exp softens; +4 floor keeps variety
-}
-
-// Weighted sampling WITHOUT replacement: pick n distinct cards, each draw proportional
-// to draftWeight. Removes the chosen card so it can't be drawn twice.
-function weightedSample(pool, n, weightFn) {
-  const items = [...pool];
-  const out = [];
-  while (out.length < n && items.length) {
-    const total = items.reduce((s, p) => s + weightFn(p), 0);
-    let r = Math.random() * total;
-    let idx = items.length - 1;
-    for (let i = 0; i < items.length; i++) { r -= weightFn(items[i]); if (r <= 0) { idx = i; break; } }
-    out.push(items.splice(idx, 1)[0]);
-  }
-  return out;
-}
-
-function fmtM(v) {
-  if (v == null) return '€?M';
-  const neg = v < 0; const a = Math.abs(v);
-  let s;
-  if (a < 10 && a % 1 !== 0) s = a.toFixed(1);
-  else s = Math.round(a).toString();
-  return (neg ? '−€' : '€') + s + 'M';
-}
-
-function useCountUp(target, run, ms = 800) {
-  const [val, setVal] = useState(run ? 0 : target);
-  useEffect(() => {
-    if (!run) { setVal(target); return; }
-    let raf, start;
-    const from = 0;
-    const tick = (t) => {
-      if (start == null) start = t;
-      const k = Math.min(1, (t - start) / ms);
-      const e = 1 - Math.pow(1 - k, 3);
-      setVal(from + (target - from) * e);
-      if (k < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [target, run, ms]);
-  return val;
-}
-
-function useTween(target, ms = 650) {
-  const [val, setVal] = useState(target);
-  const fromRef = useRef(target);
-  useEffect(() => {
-    const from = fromRef.current;
-    let raf, start;
-    const tick = (t) => {
-      if (start == null) start = t;
-      const k = Math.min(1, (t - start) / ms);
-      const e = 1 - Math.pow(1 - k, 3);
-      const cur = from + (target - from) * e;
-      setVal(cur);
-      if (k < 1) raf = requestAnimationFrame(tick);
-      else fromRef.current = target;
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [target, ms]);
-  return val;
-}
-
-// Scoring
-function squadValue(mgr) {
-  return Object.values(mgr.squad).reduce((sum, pid) => sum + (pid ? PLAYER_BY_ID[pid].curVal : 0), 0);
-}
-function scoreOf(mgr) {
-  // gain from each pick: original = curVal−buyVal, replacement = curVal−sellVal (window price paid)
-  const heldGain = Object.keys(mgr.squad).reduce((sum, pos) => {
-    const pid = mgr.squad[pos];
-    if (!pid) return sum;
-    const p = PLAYER_BY_ID[pid];
-    return sum + p.curVal - (mgr.locked[pos] ? p.sellVal : p.buyVal);
-  }, 0);
-  return heldGain + mgr.bankedProfit;
-}
-// What a manager paid for the player currently in a slot: draft value for an original
-// pick, or the window-year price paid for a redrafted replacement. Spoiler-free —
-// these are the figures the manager already saw when acquiring the player.
-function paidFor(mgr, posKey) {
-  const pid = mgr.squad[posKey];
-  if (!pid) return 0;
-  return mgr.locked[posKey] ? PLAYER_BY_ID[pid].sellVal : PLAYER_BY_ID[pid].buyVal;
-}
-function squadPaid(mgr) {
-  return Object.keys(mgr.squad).reduce((sum, pos) => sum + paidFor(mgr, pos), 0);
-}
-
-/* =========================================================================
-   REDUCER
-   ========================================================================= */
-
-const initial = {
-  state: 'SETUP',
-  seasonStep: 0,
-  managers: [],
-  shelf: {},          // { pos: [player, ...] }  remaining undrafted cards
-  board: [],          // the cards drawn for the current draft round
-  draftIdx: 0,        // which manager is picking this round
-  picking: null,      // card index pending confirmation
-  outIdx: null,       // card index animating out
-  windowMgr: 0,       // current manager in window decide
-  windowSel: {},      // { playerId: true } toggled-for-sale (current manager)
-  sold: [],           // [{ mgrId, pos, player, replacementId|null }]
-  revealIdx: 0,       // window reveal: which sold player
-  revealStage: 0,     // window reveal: 0..6
-  finalMgr: 0,        // final reveal: which manager is being revealed (one at a time)
-  finalIdx: -1,       // final reveal: index into PITCH_ORDER (per-position aggregated)
-  finalProfit: false, // whether banked profits added on final screen
-  standRevealed: 0,   // standings rows revealed
-};
-
-function curSeason(s) { return SEASON_SEQUENCE[s.seasonStep]; }
-
-function reducer(state, action) {
-  switch (action.type) {
-    case 'START': {
-      const managers = action.managers.map((name, i) => ({
-        id: 'm' + i, name, squad: { CB:null,WF:null,DM:null,GK:null,ST:null,AM:null,CB2:null },
-        totalSpent: 0, bankedProfit: 0,
-        locked: {}, // positions holding a window replacement — can't be sold again
-      }));
-      return { ...initial, managers, state: 'ANNOUNCE', seasonStep: 0 };
-    }
-
-    case 'ANNOUNCE_DONE': {
-      const se = curSeason(state);
-      // Start each window fresh — `sold` must not carry over from a previous window,
-      // otherwise the reveal (revealIdx resets to 0) replays earlier windows' sales.
-      if (se.type === 'window') return { ...state, state: 'WINDOW_DECIDE', windowMgr: 0, windowSel: {}, sold: [] };
-      // Draw the board for this draft: max(5, 2×managers) random cards from the deep pool.
-      const pool = DRAFT_POOLS[se.pos];
-      const n = Math.min(pool.length, Math.max(5, 2 * state.managers.length));
-      const board = weightedSample(pool, n, draftWeight);
-      return { ...state, state: 'DRAFT', draftIdx: 0, picking: null, outIdx: null, board };
-    }
-
-    case 'PICK_INTENT':
-      return { ...state, picking: action.cardIdx };
-    case 'PICK_CANCEL':
-      return { ...state, picking: null };
-
-    case 'PICK_CONFIRM': {
-      const se = curSeason(state);
-      const pos = se.pos;
-      const card = state.board[action.cardIdx];
-      const mgr = state.managers[state.draftIdx];
-      const managers = state.managers.map((m, i) =>
-        i === state.draftIdx
-          ? { ...m, squad: { ...m.squad, [pos]: card.id }, totalSpent: m.totalSpent + card.buyVal }
-          : m
-      );
-      return { ...state, managers, picking: null, outIdx: action.cardIdx };
-    }
-
-    case 'PICK_OUT_DONE': {
-      const se = curSeason(state);
-      const pos = se.pos;
-      const nextIdx = state.draftIdx + 1;
-      if (nextIdx < state.managers.length) {
-        return { ...state, draftIdx: nextIdx, outIdx: null };
-      }
-      // round done -> shelf = the drawn board minus the drafted cards
-      const pickedIds = state.managers.map(m => m.squad[pos]);
-      const shelf = { ...state.shelf, [pos]: state.board.filter(p => !pickedIds.includes(p.id)) };
-      return { ...state, shelf, outIdx: null, state: 'SQUAD' };
-    }
-
-    case 'SQUAD_DONE': {
-      const next = SEASON_SEQUENCE[state.seasonStep + 1];
-      if (!next || next.type === 'reveal')
-        return { ...state, seasonStep: state.seasonStep + 1, state: 'FINAL_REVEAL', finalMgr: 0, finalIdx: -1, finalProfit: false };
-      return { ...state, seasonStep: state.seasonStep + 1, state: 'ANNOUNCE' };
-    }
-
-    case 'WINDOW_TOGGLE': {
-      // Multi-select: sell any number of original picks this window.
-      const sel = { ...state.windowSel };
-      if (sel[action.playerId]) delete sel[action.playerId]; else sel[action.playerId] = true;
-      return { ...state, windowSel: sel };
-    }
-
-    case 'WINDOW_CONFIRM': {
-      // Record the (at most one) sale for the current manager. Any player in the
-      // squad can be sold this window, not just this window's positions.
-      const mgr = state.managers[state.windowMgr];
-      const newSold = [];
-      Object.keys(mgr.squad).forEach(pos => {
-        const pid = mgr.squad[pos];
-        if (pid && state.windowSel[pid] && !mgr.locked[pos]) {
-          newSold.push({ mgrId: mgr.id, pos, player: PLAYER_BY_ID[pid], replacementId: null });
-        }
-      });
-      const sold = [...state.sold, ...newSold];
-      const nextMgr = state.windowMgr + 1;
-      if (nextMgr < state.managers.length) {
-        return { ...state, sold, windowMgr: nextMgr, windowSel: {} };
-      }
-      // all managers decided
-      if (sold.length === 0) {
-        // nothing sold -> straight to squad
-        return { ...state, sold, state: 'SQUAD' };
-      }
-      return enterSold({ ...state, sold }, 0);
-    }
-
-    case 'SELECT_REPLACEMENT': {
-      // Chosen on the anonymous REPLACE_PICK page, BEFORE the reveal. Only record the
-      // choice + remove the card from the shelf here — money is applied on reveal commit.
-      const item = state.sold[state.revealIdx];
-      const sold = state.sold.map((s, i) => i === state.revealIdx ? { ...s, replacementId: action.playerId } : s);
-      const shelf = { ...state.shelf, [item.pos]: state.shelf[item.pos].filter(p => p.id !== action.playerId) };
-      return { ...state, sold, shelf, state: 'WINDOW_REVEAL', revealStage: 0 };
-    }
-
-    case 'REVEAL_NEXT': {
-      // Stages for the SOLD player: 0 buy · 1 sell · 2 identity · 3 sale profit/loss
-      // · 4 (only if a replacement was chosen) replacement old→new market value.
-      const item = state.sold[state.revealIdx];
-      const maxStage = item.replacementId ? 4 : 3;
-      if (state.revealStage < maxStage) return { ...state, revealStage: state.revealStage + 1 };
-      // final stage -> apply money, then move to the next sold player (or squad)
-      return enterSold(applySoldMoney(state), state.revealIdx + 1);
-    }
-
-    case 'FINAL_NEXT': {
-      // Reveal one manager fully (positions back-to-front, then the profit pass)
-      // before moving on to the next manager — one team at a time.
-      if (state.finalIdx < PITCH_ORDER.length - 1) return { ...state, finalIdx: state.finalIdx + 1 };
-      if (!state.finalProfit) return { ...state, finalProfit: true };
-      if (state.finalMgr < state.managers.length - 1)
-        return { ...state, finalMgr: state.finalMgr + 1, finalIdx: -1, finalProfit: false };
-      return { ...state, state: 'STANDINGS', standRevealed: 0 };
-    }
-
-    case 'STAND_NEXT':
-      return { ...state, standRevealed: Math.min(state.standRevealed + 1, state.managers.length) };
-
-    case 'PLAY_AGAIN':
-      return { ...initial };
-
-    default:
-      return state;
-  }
-}
-
-// Enter sold player `idx`: pick a replacement first (if the shelf has options),
-// otherwise go straight to the reveal. When no sold players remain, return to squad.
-function enterSold(state, idx) {
-  if (idx >= state.sold.length) return { ...state, state: 'SQUAD' };
-  const item = state.sold[idx];
-  const hasShelf = (state.shelf[item.pos] || []).length > 0;
-  return { ...state, revealIdx: idx, revealStage: 0, state: hasShelf ? 'REPLACE_PICK' : 'WINDOW_REVEAL' };
-}
-
-// Apply the money for the current sold player once its reveal completes.
-// Replacement costs its CURRENT market value (keeping the original buy in totalSpent),
-// so rebuying at market nets to zero; transfer profit = sell price − replacement cost.
-function applySoldMoney(state) {
-  const item = state.sold[state.revealIdx];
-  const repl = item.replacementId ? PLAYER_BY_ID[item.replacementId] : null;
-  const managers = state.managers.map(m => {
-    if (m.id !== item.mgrId) return m;
-    if (repl) {
-      return {
-        ...m,
-        squad: { ...m.squad, [item.pos]: repl.id },
-        locked: { ...m.locked, [item.pos]: true }, // a redraft can't be sold again
-        totalSpent: m.totalSpent + repl.sellVal,   // charge window-year price, not 2025/26 value
-        bankedProfit: m.bankedProfit + (item.player.sellVal - item.player.buyVal),
-      };
-    }
-    // sold without replacing -> empty slot
-    if (m.squad[item.pos] !== item.player.id) return m;
-    return {
-      ...m,
-      squad: { ...m.squad, [item.pos]: null },
-      bankedProfit: m.bankedProfit + (item.player.sellVal - item.player.buyVal),
-    };
-  });
-  return { ...state, managers };
-}
-
-/* =========================================================================
-   SHARED COMPONENTS
-   ========================================================================= */
-
-// Card value tiers (thresholds from the inlined pools: p85 ≈ €60M, median ≈ €35M)
-function tierOf(v) { return v >= 60 ? 'tier-gold' : v >= 25 ? 'tier-silver' : 'tier-bronze'; }
-
-function PosBadge({ pos, size }) {
-  return <span className={'pos-badge' + (size ? ' ' + size : '')}>{POS_LABEL[pos] || pos}</span>;
-}
-
-function Silhouette({ className, style }) { return <div className={'silh ' + (className || '')} style={style} />; }
-
-function StatRow({ label, value }) {
-  const isText = typeof value === 'string';
-  return (
-    <div className="stat-row">
-      <span className="stat-lbl">{label}</span>
-      <span className={'stat-val' + (isText ? ' text' : '')}>{value}</span>
-    </div>
-  );
-}
-
-function Money({ value, run, ms, className }) {
-  const v = useCountUp(value, run, ms);
-  return <span className={'mono-num ' + (className || '')}>{fmtM(v)}</span>;
-}
-
-function AdvanceHint({ children }) {
-  return (
-    <div className="advance-chip-row">
-      <span className="advance-chip"><span className="keycap">Space</span> or click — {children}</span>
-    </div>
-  );
-}
-
-// Big "whose turn" chip — the sidebar highlight alone is too peripheral on a TV.
-// Keyed by mgr.id so it pops on every handover.
-function TurnChip({ mgr }) {
-  return (
-    <div className="turn-chip">
-      <div className="avatar">{mgr.name.charAt(0).toUpperCase()}</div>
-      <div>
-        <div className="tc-name">{mgr.name}</div>
-        <div className="tc-lbl">On the clock</div>
-      </div>
-    </div>
-  );
-}
-
-/* =========================================================================
-   SIDEBAR
-   ========================================================================= */
-
-function Sidebar({ state }) {
-  const cur = state.seasonStep;
-  return (
-    <aside className="sidebar">
-      <div className="side-brand">THE<span className="dot">.</span>SCOUT</div>
-      <div className="rail">
-        <div className="rail-title">Seasons</div>
-        {SEASON_SEQUENCE.map(s => (
-          <div key={s.step} className={'rail-step' + (s.step === cur ? ' active' : s.step < cur ? ' done' : '')}>
-            <span className="rail-bullet" />
-            <span className="rail-yr">{s.yr}</span>
-            <span className="rail-pos">{s.type === 'draft' ? POS_LABEL[s.pos] : s.type === 'window' ? 'WINDOW' : 'REVEAL'}</span>
-          </div>
-        ))}
-      </div>
-      <div className="mgr-list">
-        {state.managers.map((m, i) => {
-          const isCurrent = (state.state === 'DRAFT' && i === state.draftIdx) ||
-                            (state.state === 'WINDOW_DECIDE' && i === state.windowMgr);
-          return (
-            <div key={m.id} className={'mgr-row' + (isCurrent ? ' current' : '')}>
-              <div className="avatar">{m.name.charAt(0).toUpperCase()}</div>
-              <div className="mgr-meta">
-                <span className="mgr-name">{m.name}</span>
-                <span className="mgr-sub">Profit {fmtM(m.bankedProfit)}</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </aside>
-  );
-}
-
-/* =========================================================================
-   SCREENS
-   ========================================================================= */
-
-function SetupScreen({ dispatch }) {
-  const [names, setNames] = useState(['', '']);
-  const valid = names.filter(n => n.trim()).length >= 2;
-  const update = (i, v) => setNames(names.map((n, j) => j === i ? v : n));
-  const add = () => names.length < 6 && setNames([...names, '']);
-  const remove = (i) => names.length > 2 && setNames(names.filter((_, j) => j !== i));
-  const start = () => valid && dispatch({ type: 'START', managers: names.map(n => n.trim()).filter(Boolean) });
-
-  return (
-    <div className="scene scene-full">
-      <div className="setup-wrap">
-        <div className="setup-left">
-          <div className="display">The<br/>Scout</div>
-          <div className="tagline">Invest blind. 7 drafts · 2 windows · 1 reveal.</div>
-          <div className="timeline-strip">
-            {SEASON_SEQUENCE.map(s => (
-              <div key={s.step} className="tl-pill">
-                <span>{s.yr}</span>
-                <span className="tl-pos">{s.type === 'draft' ? POS_LABEL[s.pos] : s.type === 'window' ? '⇄' : '★'}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="setup-right">
-          <h3>Managers</h3>
-          {names.map((n, i) => (
-            <div key={i} className="mgr-input-row">
-              <div className="avatar">{(n.trim()[0] || (i+1)).toString().toUpperCase()}</div>
-              <input value={n} placeholder={'Manager ' + (i+1)} maxLength={16}
-                     onChange={e => update(i, e.target.value)}
-                     onKeyDown={e => e.key === 'Enter' && start()} autoFocus={i === 0} />
-              {names.length > 2 && <button className="rm" onClick={() => remove(i)}>×</button>}
-            </div>
-          ))}
-          {names.length < 6 && <button className="add-mgr" onClick={add}>+ Add Manager</button>}
-          <div style={{ marginTop: 24 }}>
-            <button className="btn btn-primary btn-lg" style={{ width: '100%' }} disabled={!valid} onClick={start}>
-              Start Game
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AnnounceScreen({ state, dispatch }) {
-  const se = curSeason(state);
-  const isWindow = se.type === 'window';
-  const yearNum = useCountUp(parseInt(se.yr), true, 700);
-  const advance = () => dispatch({ type: 'ANNOUNCE_DONE' });
-  useKey(' ', advance); useKey('Enter', advance);
-
-  const statKeys = !isWindow ? STAT_KEYS[se.pos] : null;
-  return (
-    <div className="scene scene-full" onClick={advance}>
-      <div className="announce-bg">
-        <div className="bg-blob a" />
-        <div className="bg-blob b" />
-        <div className="bg-pitch" />
-      </div>
-      <div className="announce">
-        <div className="season-no rise">Season {se.step + 1} · {se.yr}</div>
-        <div className="big-year">{Math.round(yearNum)}/{(Math.round(yearNum)+1).toString().slice(2)}</div>
-        <div className="slam">
-          {isWindow
-            ? <PosBadge pos="⇄" size="lg" />
-            : <span className="pos-badge lg">{POS_LABEL[se.pos]}</span>}
-        </div>
-        <div className="tagline rise" style={{ animationDelay: '.55s' }}>
-          {isWindow ? `Transfer Window ${se.window} — hold or cash out` : `Time to scout a ${se.label}`}
-        </div>
-        {!isWindow && (
-          <div className="stat-preview">
-            {statKeys.map((k, i) => (
-              <div key={k} className="sp-pill rise" style={{ animationDelay: (0.65 + i*0.08) + 's' }}>{k}</div>
-            ))}
-          </div>
-        )}
-        <AdvanceHint>continue</AdvanceHint>
-      </div>
-    </div>
-  );
-}
-
-function DraftScreen({ state, dispatch }) {
-  const se = curSeason(state);
-  const pos = se.pos;
-  const pool = state.board;
-  const mgr = state.managers[state.draftIdx];
-  const pickedThisRound = state.managers.slice(0, state.draftIdx).map(m => m.squad[pos]);
-  // Up to 6 cards in one row; more wraps into two rows. Compact shrinks the cards.
-  const cols = pool.length <= 6 ? pool.length : Math.ceil(pool.length / 2);
-  const compact = pool.length > 6;
-
-  // handle out animation completion
-  useEffect(() => {
-    if (state.outIdx != null) {
-      const t = setTimeout(() => dispatch({ type: 'PICK_OUT_DONE' }), 560);
-      return () => clearTimeout(t);
-    }
-  }, [state.outIdx]);
-
-  const intent = (i) => { if (!pickedThisRound.includes(pool[i].id) && state.outIdx == null) dispatch({ type: 'PICK_INTENT', cardIdx: i }); };
-  // keyboard 1-9
-  const intentRef = useRef();
-  intentRef.current = (n) => { if (state.picking == null && n <= pool.length) intent(n - 1); };
-  useEffect(() => {
-    const h = (e) => {
-      const n = parseInt(e.key);
-      if (n >= 1 && n <= 9) intentRef.current(n);
-    };
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, []);
-
-  return (
-    <div className="scene">
-      <div className="scene-head" style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-        <div>
-          <div className="h1">The Board</div>
-          <div className="sub">Pick your {se.label}. Stats only, no names.</div>
-        </div>
-        <TurnChip key={mgr.id} mgr={mgr} />
-      </div>
-      <div className={'draft-cards' + (compact ? ' compact' : '')} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
-        {pool.map((p, i) => {
-          const drafted = pickedThisRound.includes(p.id);
-          const out = state.outIdx === i;
-          return (
-            <div key={p.id}
-                 className={'draft-card ' + tierOf(p.buyVal) + (drafted ? ' drafted' : '') + (out ? ' out' : '')}
-                 style={{ '--i': i }}
-                 onClick={() => intent(i)}>
-              <div className="dc-top">
-                <PosBadge pos={pos} />
-                <div className="dc-num">{i + 1}</div>
-              </div>
-              <div className="dc-val">{fmtM(p.buyVal)}</div>
-              <Silhouette className="dc-silh" />
-              <div className="dc-stats">
-                {p.statKeys.map(k => <StatRow key={k} label={k} value={p.stats[k]} />)}
-              </div>
-              {drafted && <div className="drafted-stamp"><span>Drafted</span></div>}
-              {state.picking === i && (
-                <div className="pick-confirm" onClick={e => e.stopPropagation()}>
-                  <div className="pc-q">Confirm pick for<br/><span className="pc-mgr">{mgr.name}</span>?</div>
-                  <div className="pc-btns">
-                    <button className="btn btn-primary" onClick={() => dispatch({ type: 'PICK_CONFIRM', cardIdx: i })}>Yes, draft</button>
-                    <button className="btn btn-ghost" onClick={() => dispatch({ type: 'PICK_CANCEL' })}>Cancel</button>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      <div className="hint">Press 1–{Math.min(9, pool.length)} or click a card to draft for {mgr.name}</div>
-    </div>
-  );
-}
-
-// Build pitch slot data for a manager
-function pitchSlots(mgr, opts = {}) {
-  const cols = [
-    ['GK'],
-    ['CB', 'CB2'],
-    ['DM'],
-    ['AM'],
-    ['WF', 'ST'],
-  ];
-  return cols.map(col => col.map(posKey => {
-    const pid = mgr.squad[posKey];
-    return { posKey, player: pid ? PLAYER_BY_ID[pid] : null };
-  }));
-}
-
-function PitchFormation({ mgr, mode, state, dispatch }) {
-  // mode: 'view' | 'sell'
-  const cols = pitchSlots(mgr);
-  const total = useTween(squadPaid(mgr));
-
-  return (
-    <div className="pitch-wrap">
-      <div className={'pitch' + (mode === 'view' ? ' enter' : '')}>
-        {cols.map((col, ci) => (
-          <div key={ci} className="pitch-col">
-            {col.map(slot => {
-              // Original picks can be sold any window; redrafted replacements are locked.
-              const locked = mode === 'sell' && !!slot.player && !!mgr.locked[slot.posKey];
-              const sellable = mode === 'sell' && !!slot.player && !locked;
-              const isSell = mode === 'sell' && slot.player && state.windowSel[slot.player.id];
-              const revealed = mode === 'final' && finalPosRevealed(state, slot.posKey);
-              const draftYr = SEASON_SEQUENCE.find(s => s.pos === slot.posKey)?.yr;
-              let cls = 'pitch-slot ';
-              if (!slot.player) cls += 'empty';
-              else if (isSell) cls += 'sell';
-              else cls += 'filled';
-              if (sellable) cls += ' clickable';
-              if (locked) cls += ' locked';
-              return (
-                <div key={slot.posKey} className={cls} style={{ '--d': ci }}
-                     onClick={() => sellable && dispatch({ type: 'WINDOW_TOGGLE', playerId: slot.player.id })}>
-                  <div className="slot-circle">
-                    {slot.player ? <Silhouette className="slot-silh" /> : POS_LABEL[slot.posKey]}
-                    {locked && <span className="lock-badge">🔒</span>}
-                  </div>
-                  <span className="slot-pos">{POS_LABEL[slot.posKey]}</span>
-                  {slot.player ? (
-                    mode === 'final'
-                      ? (revealed
-                          ? <><span className="slot-name">{slot.player.name}</span><span className="slot-val">{fmtM(slot.player.curVal)}</span></>
-                          : <span className="slot-val">€?M</span>)
-                      : <span className="slot-val">{isSell ? 'SELL' : fmtM(paidFor(mgr, slot.posKey))}</span>
-                  ) : <span className="slot-year">{draftYr || '—'}</span>}
-                </div>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-      <div className="pitch-total">
-        <span className="lbl">Total Spent</span>
-        <span className="amt mono-num" style={{ color: total < 0 ? 'var(--bad)' : 'var(--acc)' }}>{fmtM(total)}</span>
-      </div>
-    </div>
-  );
-}
-
-function SquadScreen({ state, dispatch }) {
-  // Walk through each manager's squad one at a time (no tab switcher) — Continue
-  // moves to the next manager, then on to the next season once everyone is shown.
-  const [idx, setIdx] = useState(0);
-  const mgr = state.managers[idx];
-  const last = idx >= state.managers.length - 1;
-  const advance = () => { if (last) dispatch({ type: 'SQUAD_DONE' }); else setIdx(idx + 1); };
-  useKey(' ', advance); useKey('Enter', advance);
-
-  return (
-    <div className="scene" onClick={advance}>
-      <div className="scene-head" style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end' }}>
-        <div>
-          <div className="h1">Squad — {mgr.name}</div>
-          <div className="sub">{curSeason(state).yr} · paid for this squad</div>
-        </div>
-        <div className="sub" style={{ alignSelf:'center' }}>Team {idx + 1} of {state.managers.length}</div>
-      </div>
-      <PitchFormation key={mgr.id} mgr={mgr} mode="view" state={state} dispatch={dispatch} />
-      <div className="cta-row">
-        <button className="btn btn-primary btn-lg" onClick={e => { e.stopPropagation(); advance(); }}>
-          {last ? 'Continue →' : `Next: ${state.managers[idx + 1].name} →`}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function WindowDecideScreen({ state, dispatch }) {
-  const mgr = state.managers[state.windowMgr];
-  const se = curSeason(state);
-  const nSell = Object.keys(state.windowSel).length;
-  return (
-    <div className="scene">
-      <div className="scene-head" style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-        <div>
-          <div className="h1">Window {se.window}</div>
-          <div className="sub">Sell any of your original picks — replacements signed in a past window (🔒) can't be sold. Tap players to mark them for SALE.</div>
-        </div>
-        <TurnChip key={mgr.id} mgr={mgr} />
-      </div>
-      <PitchFormation mgr={mgr} mode="sell" state={state} dispatch={dispatch} />
-      <div className="cta-row">
-        <span style={{ marginRight: 'auto', alignSelf:'center', color:'var(--text-dim)', fontSize:20 }}>
-          {nSell === 0 ? 'Holding everyone' : `${nSell} marked to sell`}
-        </span>
-        <button className="btn btn-primary btn-lg" onClick={() => dispatch({ type: 'WINDOW_CONFIRM' })}>
-          Confirm {mgr.name}'s window →
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function WindowRevealScreen({ state, dispatch }) {
-  const item = state.sold[state.revealIdx];
-  const mgr = state.managers.find(m => m.id === item.mgrId);
-  const stage = state.revealStage;
-  const p = item.player;
-  const repl = item.replacementId ? PLAYER_BY_ID[item.replacementId] : null;
-  const profit = p.sellVal - p.buyVal;       // sale profit/loss for the sold player
-  const posLbl = POS_LABEL[p.pos];
-  const maxStage = repl ? 4 : 3;
-  const lastSold = state.revealIdx >= state.sold.length - 1;
-
-  const advance = () => dispatch({ type: 'REVEAL_NEXT' });
-  useKey(' ', advance);
-
-  return (
-    <div className="scene scene-full" onClick={advance}>
-      {stage >= 3 && <div key={state.revealIdx} className={'flash ' + (profit >= 0 ? 'good' : 'bad')} />}
-      <div className={'reveal-stage' + (stage === 3 && profit < 0 ? ' shake' : '')}>
-        <div className="kicker">{mgr.name} · {posLbl} · bought {SEASON_SEQUENCE.find(s=>s.pos===p.pos)?.yr}</div>
-
-        {/* SOLD player identity card */}
-        <div className={'rv-card' + (stage >= 2 ? ' revealed' : '')}>
-          {stage >= 2
-            ? <><div className="rv-name">{p.name}</div><div className="rv-club">{p.club}</div></>
-            : <Silhouette className="rv-silh" />}
-          <div className="rv-line"><span className="l">Bought</span><span className="v">{fmtM(p.buyVal)}</span></div>
-          {stage >= 1 && (
-            <div className="rv-line pop"><span className="l">Sold</span>
-              <Money value={p.sellVal} run={true} className="v" />
-            </div>
-          )}
-        </div>
-
-        {/* sale profit / loss */}
-        {stage >= 3 && (
-          <div className={'rv-profit-wrap ' + (profit >= 0 ? 'good' : 'bad')}>
-            <div className={'rv-profit ' + (profit >= 0 ? 'good' : 'bad')}>{profit>=0?'+':''}{fmtM(profit)}</div>
-            <div className="rv-profit-lbl">{profit >= 0 ? 'Profit' : 'Loss'} on sale</div>
-          </div>
-        )}
-
-        {/* replacement old → new market value (identity stays hidden) */}
-        {repl && stage >= 4 && (
-          <div className="rv-card pop" style={{ minWidth: 480 }}>
-            <div className="kicker">Your replacement {posLbl}</div>
-            <Silhouette className="rv-silh" style={{ width: 96, height: 96 }} />
-            <div className="rv-line"><span className="l">Was</span><span className="v" style={{ color:'var(--text-dim)' }}>{fmtM(repl.buyVal)}</span></div>
-            <div className="rv-line"><span className="l">You pay (window)</span>
-              <Money value={repl.sellVal} run={true} className="v" />
-            </div>
-          </div>
-        )}
-
-        <AdvanceHint>
-          {stage < maxStage ? 'reveal next'
-            : lastSold ? 'view squads' : 'next sale'}
-        </AdvanceHint>
-      </div>
-    </div>
-  );
-}
-
-function ReplacePickScreen({ state, dispatch }) {
-  const item = state.sold[state.revealIdx];
-  const mgr = state.managers.find(m => m.id === item.mgrId);
-  const pos = item.pos;
-  const shelf = state.shelf[pos] || [];
-  const [picking, setPicking] = useState(null);
-  // Lay cards out in columns like the draft board so each card has full height
-  // and its four stat rows are visible (a single full-width column clips them).
-  const cols = shelf.length <= 6 ? Math.max(1, shelf.length) : Math.ceil(shelf.length / 2);
-  const compact = shelf.length > 6;
-
-  return (
-    <div className="scene">
-      <div className="scene-head">
-        <div className="h1">Replace your {POS_LABEL[pos]}</div>
-        <div className="sub"><span style={{color:'var(--acc)',fontWeight:700}}>{mgr.name}</span> — pick a replacement. Stats only, no names. Identity stays hidden until the final reveal.</div>
-      </div>
-      <div className={'draft-cards' + (compact ? ' compact' : '')} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
-        {shelf.map((p, i) => (
-          <div key={p.id} className={'draft-card ' + tierOf(p.buyVal)} style={{ '--i': i }} onClick={() => setPicking(i)}>
-            <div className="dc-top"><PosBadge pos={pos} /><div className="dc-num">{i + 1}</div></div>
-            <div className="dc-val">{fmtM(p.buyVal)}</div>
-            <Silhouette className="dc-silh" />
-            <div className="dc-stats">
-              {p.statKeys.map(k => <StatRow key={k} label={k} value={p.stats[k]} />)}
-            </div>
-            {picking === i && (
-              <div className="pick-confirm" onClick={e => e.stopPropagation()}>
-                <div className="pc-q">Sign this player for<br/><span className="pc-mgr">{mgr.name}</span>?</div>
-                <div className="pc-btns">
-                  <button className="btn btn-primary" onClick={() => dispatch({ type:'SELECT_REPLACEMENT', playerId: p.id })}>Yes, sign</button>
-                  <button className="btn btn-ghost" onClick={() => setPicking(null)}>Cancel</button>
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-      <div className="hint">Click a card to sign · you'll pay their current market value (revealed next) · name stays hidden until the end</div>
-    </div>
-  );
-}
-
-function finalPosRevealed(state, posKey) {
-  const idx = PITCH_ORDER.indexOf(posKey);
-  return idx <= state.finalIdx;
-}
-function FinalRevealScreen({ state, dispatch }) {
-  // Final reveal goes one team at a time (no tab switcher): the current manager is
-  // revealed fully, then a click moves on to the next manager.
-  const mgr = state.managers[state.finalMgr];
-  const advance = () => dispatch({ type: 'FINAL_NEXT' });
-  useKey(' ', advance); useKey('Enter', advance);
-
-  // running total: each slot adds its gain (curVal − buyVal for originals, 0 for locked replacements)
-  let running = mgr.bankedProfit * (state.finalProfit ? 1 : 0);
-  PITCH_ORDER.forEach((posKey, idx) => {
-    if (idx <= state.finalIdx) {
-      const pid = mgr.squad[posKey];
-      const p = pid ? PLAYER_BY_ID[pid] : null;
-      running += p ? p.curVal - (mgr.locked[posKey] ? p.sellVal : p.buyVal) : 0;
-    }
-  });
-  const tween = useTween(running);
-
-  const cols = pitchSlots(mgr);
-  return (
-    <div className="scene" onClick={advance}>
-      <div className="scene-head" style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end' }}>
-        <div>
-          <div className="h1">Final Reveal</div>
-          <div className="sub">Revealing back to front. Who did {mgr.name} actually buy?</div>
-        </div>
-        <div className="sub" style={{ alignSelf:'center' }}>Team {state.finalMgr + 1} of {state.managers.length}</div>
-      </div>
-      <div className="pitch-wrap">
-        <div className="pitch">
-          {cols.map((col, ci) => (
-            <div key={ci} className="pitch-col">
-              {col.map(slot => {
-                const revealed = finalPosRevealed(state, slot.posKey);
-                const just = slot.posKey === PITCH_ORDER[state.finalIdx];
-                const nextUp = !state.finalProfit && slot.posKey === PITCH_ORDER[state.finalIdx + 1];
-                const p = slot.player;
-                // Part 2 (profit pass): each slot shows its gain/loss vs what was paid.
-                // Replacements were bought at current market value, so they net €0.
-                const net = p ? p.curVal - (mgr.locked[slot.posKey] ? p.sellVal : p.buyVal) : 0;
-                return (
-                  <div key={slot.posKey}
-                       className={'pitch-slot ' + (p ? (revealed?'filled':'empty') : 'empty') + (just ? ' just' : '') + (nextUp ? ' next-up' : '')}>
-                    <div className="slot-circle" key={revealed ? 'on' : 'off'}>
-                      {p && revealed ? <Silhouette className="slot-silh" /> : POS_LABEL[slot.posKey]}
-                    </div>
-                    <span className="slot-pos">{POS_LABEL[slot.posKey]}</span>
-                    {p
-                      ? (revealed
-                          ? <>
-                              <span className="slot-name">{p.name}</span>
-                              {state.finalProfit
-                                ? <span className="slot-val" style={{ color: net >= 0 ? 'var(--good)' : 'var(--bad)' }}>{net >= 0 ? '+' : ''}<Money value={net} run={true} ms={600} /></span>
-                                : <span className="slot-val">{fmtM(p.curVal)}</span>}
-                            </>
-                          : <span className="slot-val">€?M</span>)
-                      : <span className="slot-year">empty</span>}
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-        <div className="pitch-total">
-          <span className="lbl">{mgr.name} — Net {state.finalProfit ? '(incl. transfer profit)' : ''}</span>
-          <span className="amt mono-num" style={{ color: tween < 0 ? 'var(--bad)' : 'var(--acc)' }}>{fmtM(tween)}</span>
-        </div>
-      </div>
-      <AdvanceHint>
-        {state.finalIdx < PITCH_ORDER.length - 1 ? 'reveal next position'
-          : !state.finalProfit ? 'reveal each player’s profit / loss'
-          : state.finalMgr < state.managers.length - 1 ? `reveal ${state.managers[state.finalMgr + 1].name}’s squad`
-          : 'see final standings'}
-      </AdvanceHint>
-    </div>
-  );
-}
-
-// Winner celebration: pure-canvas confetti over the full 1920×1080 stage.
-// position:fixed resolves against the transformed #root, so it scales with the stage.
-function Confetti() {
-  const ref = useRef(null);
-  useEffect(() => {
-    const canvas = ref.current;
-    const ctx = canvas.getContext('2d');
-    const W = canvas.width = 1920, H = canvas.height = 1080;
-    const colors = ['#c8ff00', '#00d4b4', '#ffffff', '#ffd75e'];
-    const parts = [];
-    const spawn = () => parts.push({
-      x: Math.random() * W, y: -30 - Math.random() * 120,
-      vx: (Math.random() - .5) * 3, vy: 2 + Math.random() * 3.5,
-      w: 8 + Math.random() * 6, h: 5 + Math.random() * 5,
-      rot: Math.random() * Math.PI, vr: (Math.random() - .5) * .25,
-      color: colors[(Math.random() * colors.length) | 0],
-    });
-    for (let i = 0; i < 60; i++) spawn();
-    const start = performance.now();
-    let raf;
-    const tick = () => {
-      const elapsed = performance.now() - start;
-      if (elapsed < 2500 && parts.length < 160) spawn();
-      ctx.clearRect(0, 0, W, H);
-      for (let i = parts.length - 1; i >= 0; i--) {
-        const p = parts[i];
-        p.vy = Math.min(p.vy + 0.12, 7.5);
-        p.x += p.vx; p.y += p.vy; p.rot += p.vr;
-        if (p.y > H + 40) { parts.splice(i, 1); continue; }
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.rot);
-        ctx.fillStyle = p.color;
-        ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
-        ctx.restore();
-      }
-      if (parts.length > 0 || elapsed < 2500) raf = requestAnimationFrame(tick);
-      else ctx.clearRect(0, 0, W, H);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, []);
-  return <canvas ref={ref} style={{ position: 'fixed', left: 0, top: 0, width: 1920, height: 1080, pointerEvents: 'none', zIndex: 50 }} />;
-}
-
-function StandingsScreen({ state, dispatch }) {
-  const ranked = [...state.managers].map(m => ({ m, score: scoreOf(m), sq: squadValue(m) }))
-                    .sort((a, b) => b.score - a.score);
-  const allRevealed = state.standRevealed >= state.managers.length;
-  const advance = () => dispatch({ type: 'STAND_NEXT' });
-  useKey(' ', () => { if (!allRevealed) advance(); });
-
-  const podiumOrder = [ranked[1], ranked[0], ranked[2]].filter(Boolean);
-  const podClass = (r) => r === ranked[0] ? 'p1' : r === ranked[1] ? 'p2' : 'p3';
-  const rankOf = (r) => ranked.indexOf(r) + 1;
-
-  return (
-    <div className="scene scene-full" onClick={() => !allRevealed && advance()}>
-      {allRevealed && <Confetti />}
-      <div style={{ width:'100%', maxWidth:1200 }} onClick={e => e.stopPropagation()}>
-        {allRevealed && (
-          <div className="win-banner rise" style={{ marginBottom: 24 }}>
-            <div className="display">{ranked[0].m.name} Wins</div>
-            <div className="h2" style={{ fontSize: 36, color:'var(--text-dim)' }}>Net {fmtM(ranked[0].score)}</div>
-          </div>
-        )}
-        {allRevealed && (
-          <div className="podium-row">
-            {podiumOrder.map(r => (
-              <div key={r.m.id} className={'podium ' + podClass(r)}>
-                <div className="avatar pod-av">{r.m.name[0].toUpperCase()}</div>
-                <div className="pod-block">
-                  <div className="pod-rank">{rankOf(r)}</div>
-                  <div className="pod-name">{r.m.name}</div>
-                  <div className="pod-score">{fmtM(r.score)}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-        <table className="standings-table">
-          <thead><tr><th>#</th><th>Manager</th><th>Squad Value</th><th>Sales Profit</th><th>Total</th></tr></thead>
-          <tbody>
-            {ranked.map((r, i) => {
-              // Reveal bottom-up (worst → winner) for tension.
-              const show = i >= ranked.length - state.standRevealed || allRevealed;
-              const drumroll = !allRevealed && i === ranked.length - state.standRevealed - 1;
-              return (
-                <tr key={r.m.id} className={(allRevealed && i === 0 ? 'win' : '') + (show ? ' revealed' : '')}>
-                  <td className="num">{i + 1}</td>
-                  <td>{r.m.name}</td>
-                  <td className="num">{fmtM(r.sq)}</td>
-                  <td className="num">{fmtM(r.m.bankedProfit)}</td>
-                  <td className={'num' + (drumroll ? ' drumroll' : '')} style={{ color: show ? (r.score>=0?'var(--acc)':'var(--bad)') : 'var(--text-faint)', fontWeight:800 }}>
-                    {show ? <Money value={r.score} run={true} ms={700} /> : '€??M'}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        <div className="cta-row" style={{ justifyContent:'center' }}>
-          {!allRevealed
-            ? <button className="btn btn-primary btn-lg" onClick={advance}>Reveal next total →</button>
-            : <button className="btn btn-ghost btn-lg" onClick={() => dispatch({ type:'PLAY_AGAIN' })}>Play again</button>}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* =========================================================================
-   KEY HOOK + APP
-   ========================================================================= */
-
-function useKey(key, fn) {
-  const ref = useRef(fn);
-  ref.current = fn;
-  useEffect(() => {
-    const h = (e) => { if (e.key === key) { e.preventDefault(); ref.current(); } };
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, [key]);
-}
-
-// Scale the fixed 1920×1080 stage to fit the window (letterboxed on non-16:9)
-function useStageScale() {
-  useEffect(() => {
-    const fit = () => {
-      const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
-      document.getElementById('root').style.transform = `translate(-50%, -50%) scale(${s})`;
-    };
-    fit();
-    window.addEventListener('resize', fit);
-    return () => window.removeEventListener('resize', fit);
-  }, []);
-}
-
-// Deferred-swap scene transition: on key change, play the exit animation on the
-// frozen old scene, then mount the new one (which plays scene-in). gateRef blocks
-// dispatch during the out-phase so Space-mashing can't double-advance.
-function SceneShell({ sceneKey, gateRef, children }) {
-  const [shown, setShown] = useState(sceneKey);
-  const [out, setOut] = useState(false);
-  const last = useRef(children);
-  if (sceneKey === shown && !out) last.current = children;
-  useEffect(() => {
-    if (sceneKey === shown) { setOut(false); gateRef.current = false; return; }
-    setOut(true);
-    gateRef.current = true;
-    const t = setTimeout(() => { setShown(sceneKey); setOut(false); gateRef.current = false; }, 260);
-    return () => clearTimeout(t);
-  }, [sceneKey, shown]);
-  return (
-    <div className={'scene-shell' + (out ? ' out' : '')}>
-      {sceneKey === shown ? children : last.current}
-    </div>
-  );
-}
-
-function App() {
-  const [state, rawDispatch] = useReducer(reducer, initial);
-  const gateRef = useRef(false);
-  const dispatch = useCallback((a) => { if (!gateRef.current) rawDispatch(a); }, []);
-  const showSidebar = state.state !== 'SETUP';
-  useStageScale();
-
-  let screen;
-  switch (state.state) {
-    case 'SETUP':         screen = <SetupScreen dispatch={dispatch} />; break;
-    case 'ANNOUNCE':      screen = <AnnounceScreen state={state} dispatch={dispatch} />; break;
-    case 'DRAFT':         screen = <DraftScreen state={state} dispatch={dispatch} />; break;
-    case 'SQUAD':         screen = <SquadScreen state={state} dispatch={dispatch} />; break;
-    case 'WINDOW_DECIDE': screen = <WindowDecideScreen state={state} dispatch={dispatch} />; break;
-    case 'WINDOW_REVEAL': screen = <WindowRevealScreen state={state} dispatch={dispatch} />; break;
-    case 'REPLACE_PICK':  screen = <ReplacePickScreen state={state} dispatch={dispatch} />; break;
-    case 'FINAL_REVEAL':  screen = <FinalRevealScreen state={state} dispatch={dispatch} />; break;
-    case 'STANDINGS':     screen = <StandingsScreen state={state} dispatch={dispatch} />; break;
-    default:              screen = <div className="scene">Unknown state</div>;
-  }
-
-  return (
-    <>
-      {showSidebar && <Sidebar state={state} />}
-      <main className="main">
-        <SceneShell sceneKey={state.state} gateRef={gateRef}>{screen}</SceneShell>
-      </main>
-    </>
-  );
-}
-
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 </script>
 </body>
 </html>
